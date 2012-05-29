@@ -1,6 +1,6 @@
 #!/usr/bin/env python 
 # -*- coding: iso-8859-15 -*-
-from flask import Flask
+from flask import Flask, make_response
 import simplejson as json
 import psycopg2
 
@@ -31,8 +31,11 @@ def value_at_point(view, lon, lat):
     cur = conn.cursor()
     cur.execute(SQL, (lon, lat, lon, lat, lon, lat, view))
     result = cur.fetchone()
+    resp = make_response(
+        json.dumps(dict(zip(['lon', 'lat', 'view', 'value'], result))), 200)
+    resp.headers['Content-Type'] = 'application/json'
 
-    return json.dumps(dict(zip(['lon', 'lat', 'view', 'value'], result)))
+    return resp
 
 if __name__ == '__main__':
     app.debug = conf.DEBUG
