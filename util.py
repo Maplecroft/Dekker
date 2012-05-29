@@ -13,8 +13,8 @@ def prepare_table():
     # So mkdir a directory so that the raster2pgsql is happy (it
     # thinks that is a raster, so it will make a table correctly.)
     # Bit odd, and probably the wrong way to do it....
-    cmd = "mkdir %s; raster2pgsql -p -I -F %s | psql %s" % (
-        conf.TABLE, conf.TABLE, conf.DBNAME)
+    cmd = "mkdir %s; raster2pgsql -p -I -F %s | psql %s; rmdir %s" % (
+        conf.TABLE, conf.TABLE, conf.DBNAME, conf.TABLE)
     print cmd
     os.system(cmd)
 
