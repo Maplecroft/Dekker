@@ -8,7 +8,13 @@ import conf
 
 def prepare_table():
     """Sets up the table in the database"""
-    cmd = "raster2pgsql -p -I -F %s | psql %s" % (conf.TABLE, conf.DBNAME)
+
+    # Bit stupid, but we want all the rasters in one table (?)
+    # So mkdir a directory so that the raster2pgsql is happy (it
+    # thinks that is a raster, so it will make a table correctly.)
+    # Bit odd, and probably the wrong way to do it....
+    cmd = "mkdir %s; raster2pgsql -p -I -F %s | psql %s" % (
+        conf.TABLE, conf.TABLE, conf.DBNAME)
     print cmd
     os.system(cmd)
 
