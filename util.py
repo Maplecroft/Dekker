@@ -16,7 +16,8 @@ def prepare_table():
 def load_rasters_from_dir(dirname):
     """Take all the tif files and load them."""
     for fn in os.listdir(dirname):
-        cmd = "raster2pgsql -a -M -F -t 64x64 %s %s | psql %s" % (
+        cmd = "raster2pgsql -s %s -a -M -F -t 64x64 %s %s | psql %s" % (
+            conf.SRID,
             os.path.join(dirname, fn),
             conf.TABLE,
             conf.DBNAME,
