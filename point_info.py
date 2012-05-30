@@ -50,6 +50,14 @@ def value_at_point():
 
     return resp
 
+
+@app.errorhandler(400)
+def bad_request(error):
+    resp = make_response('lon, lat, and tif are all required parameters', 400)
+    resp.headers['Content-Type'] = 'text/plain'
+    return resp
+
+
 if __name__ == '__main__':
     app.debug = conf.DEBUG
     app.run()
