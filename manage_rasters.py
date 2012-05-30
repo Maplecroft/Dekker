@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 import argparse
 import os
@@ -52,6 +52,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-

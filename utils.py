@@ -1,15 +1,17 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 import psycopg2
 
 import conf
+
 
 TEMP_TABLE_SQL = """
 DROP TABLE IF EXISTS tmp_points;
 CREATE TEMP TABLE tmp_points ("gid" int, "point" geometry);
 INSERT INTO tmp_points ("gid", "point") VALUES
     <<VALUES_STATEMENTS>>
-""" 
+"""
+
 
 BUFFER_QUERY_SQL = """
 SELECT
@@ -17,7 +19,7 @@ SELECT
 CAST(AVG(((buf.geomval).val)) AS decimal(9,7)) as avgimr
 FROM (
     SELECT
-        ST_X(p.point)::NUMERIC(9, 5) AS lon, 
+        ST_X(p.point)::NUMERIC(9, 5) AS lon,
         ST_Y(p.point)::NUMERIC(9, 5) AS lat,
         p.gid,
         rast.filename,
@@ -33,8 +35,8 @@ ORDER BY filename, gid, lon, lat;
 
 
 POINT_QUERY_SQL = """
-SELECT 
-    %s AS lon, 
+SELECT
+    %s AS lon,
     %s AS lat,
     rast.filename,
     ST_Value(rast.rast, ST_SetSRID(ST_MakePoint(%s, %s), 4326))
@@ -42,7 +44,6 @@ FROM <<TABLE_NAME>> AS rast
 WHERE ST_Intersects(ST_SetSRID(ST_MakePoint(%s, %s), 4326), rast.rast)
 AND rast.filename IN %s;
 """
-
 
 
 def get_conn_cur():
@@ -98,13 +99,14 @@ def get_value_at_points(points, tifs=None):
         conn.close()
     return rows
 
+
 def get_buffer_value_at_points(buf, points, tifs=None):
     """Get a buffer of approx bufKM around point (lon, lat) in tif(s)."""
     tifs = tifs or []
 
     one_degree = 111.13  # ish, varying about the equator...
     buf_degrees = 1.0 / (one_degree / buf)
-    
+
     stmts = []
 
     test_point = points[0]
@@ -114,12 +116,12 @@ def get_buffer_value_at_points(buf, points, tifs=None):
     sql, values = get_points_table(points)
     values.extend([buf_degrees, conf.SRID, buf_degrees, conf.SRID])
     stmts.append(sql)
-    
+
     and_stmt = ""
     if len(tifs) > 0:
         and_stmt = "AND rast.filename IN %s"
         values.append(tifs)
-    
+
     sql = BUFFER_QUERY_SQL.replace(
         "<<AND_STATEMENTS>>",
         and_stmt
