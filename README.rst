@@ -11,7 +11,7 @@ an example config for this app::
     ROOT=/path/to/flask-postgis-rasters
     PID=/var/run/gunicorn-fpr.pid
 
-    APP=point_info:app
+    APP=app:app
 
     if [ -f $PID ]; then rm $PID; fi
 
