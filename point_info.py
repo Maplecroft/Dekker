@@ -1,6 +1,7 @@
 #!/usr/bin/env python 
 # -*- coding: iso-8859-15 -*-
-from flask import Flask, make_response
+from flask import Flask, abort, make_response, request
+
 import simplejson as json
 import psycopg2
 
@@ -16,23 +17,35 @@ SELECT
     ST_Value(rast.rast, ST_SetSRID(ST_MakePoint(%s, %s), 4326))
 FROM """ + conf.TABLE + """ AS rast
 WHERE ST_Intersects(ST_SetSRID(ST_MakePoint(%s, %s), 4326), rast.rast)
-AND rast.filename = %s;
+AND rast.filename IN %s;
 """
 
 
-@app.route('/point/<view>/<lon>/<lat>/')
-def value_at_point(view, lon, lat):
+@app.route('/point')
+def value_at_point():
     """Get the value at a lon, lat for a given view."""
+    lon = request.args.get('lon')
+    lat = request.args.get('lat')
+    tif = tuple(request.args.getlist('tif'))
+
+    if not lon or not lat or not len(tif):
+        abort(400)
+
     conn = psycopg2.connect(
         dbname=conf.DBNAME,
         user=conf.USER,
         host=conf.HOST,
-        password=conf.PASSWORD)
+        password=conf.PASSWORD,
+    )
     cur = conn.cursor()
-    cur.execute(SQL, (lon, lat, lon, lat, lon, lat, view))
-    result = cur.fetchone()
-    resp = make_response(
-        json.dumps(dict(zip(['lon', 'lat', 'view', 'value'], result))), 200)
+    cur.execute(SQL, (lon, lat, lon, lat, lon, lat, tif))
+    rows = cur.fetchall()
+
+    result = [
+        dict(zip(('lon', 'lat', 'view', 'value'), row)) for row in rows
+    ]
+
+    resp = make_response(json.dumps(result), 200)
     resp.headers['Content-Type'] = 'application/json'
 
     return resp
