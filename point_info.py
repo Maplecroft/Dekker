@@ -26,20 +26,26 @@ def value_at_point():
     """Get the value at a lon, lat for a given view."""
     lon = request.args.get('lon')
     lat = request.args.get('lat')
-    tif = tuple(request.args.getlist('tif'))
+    tif = tuple(request.args.getlist('tif[]'))
 
     if not lon or not lat or not len(tif):
         abort(400)
 
-    conn = psycopg2.connect(
+    kwargs = dict(
         dbname=conf.DBNAME,
         user=conf.USER,
         host=conf.HOST,
         password=conf.PASSWORD,
     )
-    cur = conn.cursor()
-    cur.execute(SQL, (lon, lat, lon, lat, lon, lat, tif))
-    rows = cur.fetchall()
+
+    rows = []
+    try:
+        conn = psycopg2.connect(**kwargs)
+        cur = conn.cursor()
+        cur.execute(SQL, (lon, lat, lon, lat, lon, lat, tif))
+        rows = cur.fetchall()
+    finally:
+        conn.close()
 
     result = [
         dict(zip(('lon', 'lat', 'view', 'value'), row)) for row in rows
