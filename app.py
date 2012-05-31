@@ -19,12 +19,14 @@ def buffer_value_at_point():
     lat = request.args.get('lat')
     tifs = tuple(request.args.getlist('tif[]'))
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
+    explain = request.args.get('explain', False) == 'true'
 
     if not lon or not lat or not len(tifs):
         abort(400)
     
     start = datetime.now()
-    rows = get_buffer_value_at_points(float(rad), [(lon, lat)], tifs)
+    rows, explanation = get_buffer_value_at_points(
+        float(rad), [(lon, lat)], tifs, explain=explain)
     values = [
         dict(zip(('gid', 'tif', 'lon', 'lat', 'value'), row)) for row in rows
     ]
@@ -34,6 +36,8 @@ def buffer_value_at_point():
         'count': len(values),
         'time': (datetime.now() - start).total_seconds(),
     }
+    if explanation:
+        result['explanation'] = explanation
    
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
@@ -45,13 +49,14 @@ def value_at_point():
     lat = request.args.get('lat')
     tifs = tuple(request.args.getlist('tif[]'))
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
+    explain = request.args.get('explain', False) == 'true'
 
     if not lon or not lat or not len(tifs):
         abort(400)
 
     start = datetime.now()
-    rows = get_value_at_points([(lon, lat)], tifs)
-
+    rows, explanation = get_value_at_points(
+        [(lon, lat)], tifs, explain=explain)
     values = [
         dict(zip(('lon', 'lat', 'view', 'value'), row)) for row in rows
     ]
@@ -61,6 +66,8 @@ def value_at_point():
         'count': len(values),
         'time': (datetime.now() - start).total_seconds(),
     }
+    if explanation:
+        result['explanation'] = explanation
    
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 

@@ -79,7 +79,7 @@ def get_points_table(points):
     return sql, values
 
 
-def get_value_at_points(points, tifs=None):
+def get_value_at_points(points, tifs=None, explain=False):
     """Get the value at the points for the tifs"""
     tifs = tifs or []
 
@@ -88,19 +88,25 @@ def get_value_at_points(points, tifs=None):
         conf.TABLE
     )
 
+    explanation = [] if explain else False
     try:
         conn, cur = get_conn_cur()
         rows = []
         # lazily, for now...
         for lon, lat in points:
             cur.execute(sql, (lon, lat, lon, lat, lon, lat, tifs))
+            if explain:
+                explanation.append(
+                    cur.mogrify(sql, (lon, lat, lon, lat, lon, lat, tifs)))
             rows.extend(cur.fetchall())
     finally:
         conn.close()
-    return rows
+    if explain:
+        explanation = "\n".join(explanation)
+    return rows, explanation
 
 
-def get_buffer_value_at_points(buf, points, tifs=None):
+def get_buffer_value_at_points(buf, points, tifs=None, explain=False):
     """Get a buffer of approx bufKM around point (lon, lat) in tif(s)."""
     tifs = tifs or []
 
@@ -131,10 +137,13 @@ def get_buffer_value_at_points(buf, points, tifs=None):
     )
     stmts.append(sql)
 
+    explanation = False
     try:
         conn, cur = get_conn_cur()
         cur.execute(";\n".join(stmts), values)
+        if explain:
+            explanation = cur.mogrify(";\n".join(stmts), values)
         result = cur.fetchall()
     finally:
         conn.close()
-    return result
+    return result, explanation
