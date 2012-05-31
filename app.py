@@ -30,7 +30,7 @@ def buffer_value_at_point():
     ]
     
     result = {
-        'list': values,
+        'result': values,
         'count': len(values),
         'time': (datetime.now() - start).total_seconds(),
     }
@@ -57,7 +57,7 @@ def value_at_point():
     ]
 
     result = {
-        'list': values,
+        'result': values,
         'count': len(values),
         'time': (datetime.now() - start).total_seconds(),
     }
