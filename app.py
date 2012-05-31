@@ -14,7 +14,7 @@ app = Flask(__name__)
 def buffer_value_at_point():
     """View to get average value in buffer around point."""
     
-    buf = request.args.get('buffer')
+    rad = request.args.get('radius')
     lon = request.args.get('lon')
     lat = request.args.get('lat')
     tifs = tuple(request.args.getlist('tif[]'))
@@ -24,7 +24,7 @@ def buffer_value_at_point():
         abort(400)
     
     start = datetime.now()
-    rows = get_buffer_value_at_points(float(buf), [(lon, lat)], tifs)
+    rows = get_buffer_value_at_points(float(rad), [(lon, lat)], tifs)
     values = [
         dict(zip(('gid', 'tif', 'lon', 'lat', 'value'), row)) for row in rows
     ]
