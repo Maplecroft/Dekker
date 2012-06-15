@@ -14,9 +14,9 @@ an example config for this app::
 
     #!/bin/sh
 
-    GUNICORN=/path/to/fpr/virtualenv/bin/gunicorn
-    ROOT=/path/to/flask-postgis-rasters
-    PID=/var/run/gunicorn-fpr.pid
+    GUNICORN=/path/to/dekker/virtualenv/bin/gunicorn
+    ROOT=/path/to/Dekker
+    PID=/var/run/gunicorn-dekker.pid
 
     APP=app:app
 
@@ -27,13 +27,14 @@ an example config for this app::
 
 It's advisable to run this as a user other than root, but you can do that
 easily with runit by changing the ownership of the ``ok``, ``control``, and
-``status`` files inside the ``supervise`` sub-directory of the service to the user
-you want to run the service as, then just calling ``sv start fpr`` as that user.
+``status`` files inside the ``supervise`` sub-directory of the service to the
+user you want to run the service as, then just calling ``sv start dekker`` as
+that user.
 
 Given the above setup with Runit, the required Nginx configuration is quite
 simple::
 
-    upstream fpr
+    upstream dekker
     {
         server localhost:8000;
     }
@@ -41,12 +42,12 @@ simple::
     server
     {
         listen 80;
-        server_name fpr.example.com;
-        root /path/to/flask-postgis-rasters;
+        server_name dekker.example.com;
+        root /path/to/Dekker;
 
         location /
         {
-            proxy_pass http://fpr;
+            proxy_pass http://dekker;
         }
     }
 

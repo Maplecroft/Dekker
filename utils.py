@@ -111,7 +111,7 @@ def get_buffer_value_at_points(buf, points, tifs=None, explain=False):
     tifs = tifs or []
 
     one_degree = 111.13  # ish, varying about the equator...
-    buf_degrees = 1.0 / (one_degree / buf)
+    buf_degrees = buf / one_degree
 
     stmts = []
 
