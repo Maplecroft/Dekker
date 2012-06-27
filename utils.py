@@ -28,7 +28,7 @@ FROM (
     WHERE ST_Intersects(ST_SetSRID(ST_Buffer(p.point, %s), %s), rast.rast)
     <<AND_STATEMENTS>>
 ) AS buf
-WHERE (buf.geomval).val >= 0
+WHERE (buf.geomval).val >= 0 AND (buf.geomval).val <= 10
 GROUP BY filename, gid, lon, lat
 ORDER BY filename, gid, lon, lat;
 """
