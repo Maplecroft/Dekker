@@ -16,7 +16,7 @@ INSERT INTO tmp_points ("gid", "point") VALUES
 BUFFER_QUERY_SQL = """
 SELECT
     gid, filename, lon, lat,
-CAST(AVG(((buf.geomval).val)) AS decimal(9,7)) as avgimr
+CAST(SUM(ST_Area((buf.geomval).geom)*(buf.geomval).val)/SUM(ST_Area((buf.geomval).geom)) AS decimal(9,7)) as avgimr
 FROM (
     SELECT
         ST_X(p.point)::NUMERIC(9, 5) AS lon,
