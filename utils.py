@@ -34,6 +34,35 @@ ORDER BY filename, gid, lon, lat;
 """
 
 
+BUFFER_QUERY_SQL_201 = """
+SELECT
+	gid, filename, lon, lat,
+	CAST(SUM(ST_Area((foo.gv).geom)*(foo.gv).val)/SUM(ST_Area((foo.gv).geom)) AS decimal(9,7)) as avgimr,
+	COUNT(foo.gv) as parts
+FROM (
+	SELECT
+
+		ST_X(p.point)::NUMERIC(9, 5) AS lon, 
+		ST_Y(p.point)::NUMERIC(9, 5) AS lat,
+		p.gid,
+		sn.filename,
+		ST_Intersection(
+			ST_Transform(sn.rast, 97099, 'Bilinear'),
+			ST_Buffer(ST_Transform(ST_SetSRID(p.point, 4326), 97099), 25000)
+		) AS gv
+	FROM <<TABLE_NAME>> sn, tmp_points p
+	WHERE ST_Intersects(
+		ST_Buffer(ST_Transform(ST_SetSRID(p.point, 4326), 97099), 25000),
+		ST_Transform(sn.rast, 97099, 'Bilinear')
+	)
+    <<AND_STATEMENTS>>
+) AS foo
+WHERE (foo.gv).val >= 0 --AND (foo.gv).val <= 10
+GROUP BY filename, gid, lon, lat
+ORDER BY filename, gid, lon, lat;
+"""
+
+
 POINT_QUERY_SQL = """
 SELECT
     %s AS lon,
@@ -125,10 +154,10 @@ def get_buffer_value_at_points(buf, points, tifs=None, explain=False):
 
     and_stmt = ""
     if len(tifs) > 0:
-        and_stmt = "AND rast.filename IN %s"
+        and_stmt = "AND sn.filename IN %s"
         values.append(tifs)
 
-    sql = BUFFER_QUERY_SQL.replace(
+    sql = BUFFER_QUERY_SQL_201.replace(
         "<<AND_STATEMENTS>>",
         and_stmt
     ).replace(
