@@ -48,11 +48,11 @@ FROM (
 		sn.filename,
 		ST_Intersection(
 			ST_Transform(sn.rast, 97099, 'Bilinear'),
-			ST_Buffer(ST_Transform(ST_SetSRID(p.point, 4326), 97099), 25000)
+			ST_Buffer(ST_Transform(ST_SetSRID(p.point, %s), 97099), %s)
 		) AS gv
 	FROM <<TABLE_NAME>> sn, tmp_points p
 	WHERE ST_Intersects(
-		ST_Buffer(ST_Transform(ST_SetSRID(p.point, 4326), 97099), 25000),
+		ST_Buffer(ST_Transform(ST_SetSRID(p.point, %s), 97099), %s),
 		ST_Transform(sn.rast, 97099, 'Bilinear')
 	)
     <<AND_STATEMENTS>>
@@ -149,7 +149,7 @@ def get_buffer_value_at_points(buf, points, tifs=None, explain=False):
         points = [(n, p[0], p[1]) for n, p in enumerate(points)]
 
     sql, values = get_points_table(points)
-    values.extend([buf_degrees, conf.SRID, buf_degrees, conf.SRID])
+    values.extend([conf.SRID, buf_degrees, conf.SRID, buf_degrees])
     stmts.append(sql)
 
     and_stmt = ""
