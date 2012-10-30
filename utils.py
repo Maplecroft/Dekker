@@ -75,6 +75,17 @@ AND rast.filename IN %s;
 """
 
 
+POINT_IN_POLYGON_SQL = """
+SELECT  
+    <<FIELD>>
+FROM <<TABLE_NAME>>
+WHERE ST_Contains(
+    geom,
+    ST_GeomFromText('POINT(%s %s)', 4326)
+); 
+"""
+
+
 def get_conn_cur():
     """DB setup shortcut."""
     conn = psycopg2.connect(
@@ -106,6 +117,33 @@ def get_points_table(points):
     )
 
     return sql, values
+
+
+def get_point_in_polygon_value(point, table, field, explain=False):
+    """
+    Given a lat-lon point and a PostGIS table, get the field value
+    of the polygon that contains the point.
+    """
+    row = ''
+    sql = POINT_IN_POLYGON_SQL.replace(
+        "<<TABLE_NAME>>", table).replace(
+        "<<FIELD>>", field)
+    explanation = [] if explain else False
+    try:
+        conn, cur = get_conn_cur()
+        lat = float(point.get('lat'))
+        lon = float(point.get('lon'))
+        cur.execute(sql, (lon, lat) )
+        if explain:
+            explanation.append( cur.mogrify( sql, (lon, lat) ) )
+        values = cur.fetchall() 
+        value = values[0][0] if len(values) > 0 else ''
+        row = [ field, value ]
+    finally:
+        conn.close()
+    if explain:
+        explanation = "\n".join(explanation)
+    return row, explanation
 
 
 def get_value_at_points(points, tifs=None, explain=False):

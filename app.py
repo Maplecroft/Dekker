@@ -5,7 +5,8 @@ from flask import Flask, abort, make_response, request, jsonify
 from flask import __version__ as flask_version
 
 import conf
-from utils import get_value_at_points, get_buffer_value_at_points
+from utils import (get_value_at_points, get_buffer_value_at_points, 
+    get_point_in_polygon_value)
 
 app = Flask(__name__)
 
@@ -69,6 +70,34 @@ def value_at_point():
     if explanation:
         result['explanation'] = explanation
    
+    return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+
+@app.route('/point_in_polygon')
+def value_point_in_pol():
+    """Get the value for a polygon field at a lon, lat."""
+    lon = request.args.get('lon')
+    lat = request.args.get('lat')
+    table = request.args.get('table')
+    field = request.args.get('field')
+    jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
+    explain = request.args.get('explain', False) == 'true'
+
+    if not lon or not lat or not table or not field:
+        abort(400)
+
+    start = datetime.now()
+    point = {'lon': lon, 'lat': lat}
+    row, explanation = get_point_in_polygon_value( 
+        point, table, field, explain=explain )
+
+    result = {
+        'field': row[0],
+        'result': row[1],
+        'time': (datetime.now() - start).total_seconds(),
+    }
+    if explanation:
+        result['explanation'] = explanation
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
 
