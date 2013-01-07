@@ -6,7 +6,7 @@ from flask import __version__ as flask_version
 
 import conf
 from utils import (get_value_at_points, get_buffer_value_at_points, 
-    get_point_in_polygon_value)
+    get_buffer_value_at_point, get_point_in_polygon_value)
 
 app = Flask(__name__)
 
@@ -14,27 +14,26 @@ app = Flask(__name__)
 @app.route('/buffer')
 def buffer_value_at_point():
     """View to get average value in buffer around point."""
-    
+    point_id = request.args.get('id')
     rad = request.args.get('radius')
     lon = request.args.get('lon')
     lat = request.args.get('lat')
-    tifs = tuple(request.args.getlist('tif[]'))
+    raster_table = request.args.get('raster_table')
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
     explain = request.args.get('explain', False) == 'true'
 
-    if not lon or not lat or not len(tifs):
+    if not lon or not lat or not len(raster_table):
         abort(400)
     
     start = datetime.now()
-    rows, explanation = get_buffer_value_at_points(
-        float(rad), [(lon, lat)], tifs, explain=explain)
-    values = [
-        dict(zip(('gid', 'tif', 'lon', 'lat', 'value'), row)) for row in rows
-    ]
-    
+    row, explanation = get_buffer_value_at_point(
+        float(rad), (lon, lat, int(point_id)), raster_table, explain=explain)
     result = {
-        'result': values,
-        'count': len(values),
+        'query': {
+            'value': row[0][1],
+            'id': row[0][0],
+            'raster': raster_table,
+        },
         'time': (datetime.now() - start).total_seconds(),
     }
     if explanation:

@@ -13,27 +13,6 @@ INSERT INTO tmp_points ("gid", "point") VALUES
 """
 
 
-BUFFER_QUERY_SQL = """
-SELECT
-    gid, filename, lon, lat,
-CAST(SUM(ST_Area((buf.geomval).geom)*(buf.geomval).val)/SUM(ST_Area((buf.geomval).geom)) AS decimal(9,7)) as avgimr
-FROM (
-    SELECT
-        ST_X(p.point)::NUMERIC(9, 5) AS lon,
-        ST_Y(p.point)::NUMERIC(9, 5) AS lat,
-        p.gid,
-        rast.filename,
-        ST_Intersection(rast.rast, ST_SetSRID(ST_Buffer(p.point, %s), %s)) AS geomval
-    FROM <<TABLE_NAME>> rast, tmp_points p
-    WHERE ST_Intersects(ST_SetSRID(ST_Buffer(p.point, %s), %s), rast.rast)
-    <<AND_STATEMENTS>>
-) AS buf
-WHERE (buf.geomval).val >= 0 AND (buf.geomval).val <= 10
-GROUP BY filename, gid, lon, lat
-ORDER BY filename, gid, lon, lat;
-"""
-
-
 BUFFER_QUERY_SQL_201 = """
 SELECT
 	gid, filename, lon, lat,
@@ -86,13 +65,41 @@ WHERE ST_Contains(
 """
 
 
+GET_BUFFER_AT_POINT = """
+SELECT * from buffers_for_raster WHERE id = %s;
+"""
+
+
+SET_BUFFER_AT_POINT_SQL = """
+INSERT INTO points_for_buffer(id, lat, lng, geom)
+    VALUES(%s, %s, %s, ST_GeomFromText('POINT(%s %s)', 4326));
+
+INSERT INTO buffers_for_raster(id, geom)
+    SELECT id, ST_Buffer(geom, 0.2249) FROM points_for_buffer
+    WHERE id = %s;
+"""
+
+
+BUFFER_QUERY_SQL = """
+SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr 
+FROM (
+    SELECT b.id, ST_Intersection(<<TABLE_NAME>>.rast, b.geom) AS geomval 
+    FROM <<TABLE_NAME>>, buffers_for_raster b 
+    WHERE ST_Intersects(b.geom, <<TABLE_NAME>>.rast)
+) AS foo 
+WHERE id = %s
+GROUP BY id
+ORDER BY id;
+"""
+
+
 def get_conn_cur():
     """DB setup shortcut."""
     conn = psycopg2.connect(
         dbname=conf.DBNAME,
         user=conf.USER,
         host=conf.HOST,
-        password=conf.PASSWORD,
+        password=conf.PASSWORD
     )
     cur = conn.cursor()
     return conn, cur
@@ -174,7 +181,11 @@ def get_value_at_points(points, tifs=None, explain=False):
 
 
 def get_buffer_value_at_points(buf, points, tifs=None, explain=False):
-    """Get a buffer of approx bufKM around point (lon, lat) in tif(s)."""
+    """
+    Deprecated, superseded by the more simple and efficient
+    `get_buffer_value_at_point`
+    """
+
     tifs = tifs or []
 
     one_degree = 111.13  # ish, varying about the equator...
@@ -203,13 +214,53 @@ def get_buffer_value_at_points(buf, points, tifs=None, explain=False):
         conf.TABLE
     )
     stmts.append(sql)
-
     explanation = False
     try:
         conn, cur = get_conn_cur()
         cur.execute(";\n".join(stmts), values)
         if explain:
             explanation = cur.mogrify(";\n".join(stmts), values)
+        result = cur.fetchall()
+    finally:
+        conn.close()
+    return result, explanation
+
+
+def set_buffer_at_point(point):
+    """
+    Checks if a buffer geometry exists for the current point and if not
+    it creates it.
+    """
+    # point is (lng, lat, id)
+    lat = float(point[1])
+    lng = float(point[0])
+    id = point[2]
+    try:
+        conn, cur = get_conn_cur()
+        conn.autocommit = True
+        cur.execute(GET_BUFFER_AT_POINT, (id,) )
+        values = cur.fetchall()
+        if len(values) == 0:
+            # Create the buffer
+            cur.execute(SET_BUFFER_AT_POINT_SQL, (id, lat, lng, lng, lat, id) )
+    finally:
+        conn.close()
+
+
+def get_buffer_value_at_point(buf, point, raster, explain=False):
+    """Get a buffer of approx bufKM around point (lon, lat) in raster."""
+    # point is (lng, lat, id)
+    one_degree = 111.13  # ish, varying about the equator...
+    buf_degrees = buf / one_degree
+    set_buffer_at_point(point)
+    sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+    explanation = False
+    id = point[2]
+    try:
+        conn, cur = get_conn_cur()
+        cur.execute(sql, (id,))
+        if explain:
+            explanation = cur.mogrify(sql, (id,))
         result = cur.fetchall()
     finally:
         conn.close()
