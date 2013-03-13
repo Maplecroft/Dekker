@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
+
 import psycopg2
 
 import conf
@@ -15,25 +16,28 @@ INSERT INTO tmp_points ("gid", "point") VALUES
 
 BUFFER_QUERY_SQL_201 = """
 SELECT
-	gid, filename, lon, lat,
-	CAST(SUM(ST_Area((foo.gv).geom)*(foo.gv).val)/SUM(ST_Area((foo.gv).geom)) AS decimal(9,7)) as avgimr,
-	COUNT(foo.gv) as parts
+    gid, filename, lon, lat,
+    CAST(
+        SUM(
+            ST_Area((foo.gv).geom) * (foo.gv).val
+        ) / SUM(ST_Area((foo.gv).geom)) AS decimal(9,7)) as avgimr,
+    COUNT(foo.gv) as parts
 FROM (
-	SELECT
+    SELECT
 
-		ST_X(p.point)::NUMERIC(9, 5) AS lon, 
-		ST_Y(p.point)::NUMERIC(9, 5) AS lat,
-		p.gid,
-		sn.filename,
-		ST_Intersection(
-			ST_Transform(sn.rast, 97099, 'Bilinear'),
-			ST_Buffer(ST_Transform(ST_SetSRID(p.point, %s), 97099), %s)
-		) AS gv
-	FROM <<TABLE_NAME>> sn, tmp_points p
-	WHERE ST_Intersects(
-		ST_Buffer(ST_Transform(ST_SetSRID(p.point, %s), 97099), %s),
-		ST_Transform(sn.rast, 97099, 'Bilinear')
-	)
+        ST_X(p.point)::NUMERIC(9, 5) AS lon,
+        ST_Y(p.point)::NUMERIC(9, 5) AS lat,
+        p.gid,
+        sn.filename,
+        ST_Intersection(
+            ST_Transform(sn.rast, 97099, 'Bilinear'),
+            ST_Buffer(ST_Transform(ST_SetSRID(p.point, %s), 97099), %s)
+        ) AS gv
+    FROM <<TABLE_NAME>> sn, tmp_points p
+    WHERE ST_Intersects(
+        ST_Buffer(ST_Transform(ST_SetSRID(p.point, %s), 97099), %s),
+        ST_Transform(sn.rast, 97099, 'Bilinear')
+    )
     <<AND_STATEMENTS>>
 ) AS foo
 WHERE (foo.gv).val >= 0 --AND (foo.gv).val <= 10
@@ -55,13 +59,13 @@ AND rast.filename IN %s;
 
 
 POINT_IN_POLYGON_SQL = """
-SELECT  
+SELECT
     <<FIELD>>
 FROM <<TABLE_NAME>>
 WHERE ST_Contains(
     geom,
     ST_GeomFromText('POINT(%s %s)', 4326)
-); 
+);
 """
 
 
@@ -81,12 +85,12 @@ INSERT INTO buffers_for_raster(id, geom)
 
 
 BUFFER_QUERY_SQL = """
-SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr 
+SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr
 FROM (
-    SELECT b.id, ST_Intersection(<<TABLE_NAME>>.rast, b.geom) AS geomval 
-    FROM <<TABLE_NAME>>, buffers_for_raster b 
+    SELECT b.id, ST_Intersection(<<TABLE_NAME>>.rast, b.geom) AS geomval
+    FROM <<TABLE_NAME>>, buffers_for_raster b
     WHERE ST_Intersects(b.geom, <<TABLE_NAME>>.rast)
-) AS foo 
+) AS foo
 WHERE id = %s
 GROUP BY id
 ORDER BY id;
@@ -140,12 +144,12 @@ def get_point_in_polygon_value(point, table, field, explain=False):
         conn, cur = get_conn_cur()
         lat = float(point.get('lat'))
         lon = float(point.get('lon'))
-        cur.execute(sql, (lon, lat) )
+        cur.execute(sql, (lon, lat))
         if explain:
-            explanation.append( cur.mogrify( sql, (lon, lat) ) )
-        values = cur.fetchall() 
+            explanation.append(cur.mogrify(sql, (lon, lat)))
+        values = cur.fetchall()
         value = values[0][0] if len(values) > 0 else ''
-        row = [ field, value ]
+        row = [field, value]
     finally:
         conn.close()
     if explain:
@@ -238,11 +242,11 @@ def set_buffer_at_point(point):
     try:
         conn, cur = get_conn_cur()
         conn.autocommit = True
-        cur.execute(GET_BUFFER_AT_POINT, (id,) )
+        cur.execute(GET_BUFFER_AT_POINT, (id,))
         values = cur.fetchall()
         if len(values) == 0:
             # Create the buffer
-            cur.execute(SET_BUFFER_AT_POINT_SQL, (id, lat, lng, lng, lat, id) )
+            cur.execute(SET_BUFFER_AT_POINT_SQL, (id, lat, lng, lng, lat, id))
     finally:
         conn.close()
 
@@ -250,8 +254,6 @@ def set_buffer_at_point(point):
 def get_buffer_value_at_point(buf, point, raster, explain=False):
     """Get a buffer of approx bufKM around point (lon, lat) in raster."""
     # point is (lng, lat, id)
-    one_degree = 111.13  # ish, varying about the equator...
-    buf_degrees = buf / one_degree
     set_buffer_at_point(point)
     sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
     explanation = False

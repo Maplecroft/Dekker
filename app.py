@@ -1,12 +1,15 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 from datetime import datetime
 from flask import Flask, abort, make_response, request, jsonify
 from flask import __version__ as flask_version
 
 import conf
-from utils import (get_value_at_points, get_buffer_value_at_points, 
-    get_buffer_value_at_point, get_point_in_polygon_value)
+from utils import (
+    get_value_at_points,
+    get_buffer_value_at_point,
+    get_point_in_polygon_value,
+)
 
 app = Flask(__name__)
 
@@ -24,21 +27,29 @@ def buffer_value_at_point():
 
     if not lon or not lat or not len(raster_table):
         abort(400)
-    
+
     start = datetime.now()
-    row, explanation = get_buffer_value_at_point(
-        float(rad), (lon, lat, int(point_id)), raster_table, explain=explain)
-    result = {
-        'query': {
-            'value': row[0][1],
-            'id': row[0][0],
-            'raster': raster_table,
-        },
-        'time': (datetime.now() - start).total_seconds(),
-    }
-    if explanation:
-        result['explanation'] = explanation
-   
+    result = {}
+    try:
+        row, explanation = get_buffer_value_at_point(
+            float(rad),
+            (lon, lat, int(point_id)),
+            raster_table,
+            explain=explain,
+        )
+        result = {
+            'query': {
+                'value': row[0][1],
+                'id': row[0][0],
+                'raster': raster_table,
+            },
+            'time': (datetime.now() - start).total_seconds(),
+        }
+        if explanation:
+            result['explanation'] = explanation
+    except:
+        abort(500)
+
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
 
@@ -68,7 +79,7 @@ def value_at_point():
     }
     if explanation:
         result['explanation'] = explanation
-   
+
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
 
@@ -87,8 +98,9 @@ def value_point_in_pol():
 
     start = datetime.now()
     point = {'lon': lon, 'lat': lat}
-    row, explanation = get_point_in_polygon_value( 
-        point, table, field, explain=explain )
+    row, explanation = get_point_in_polygon_value(
+        point, table, field, explain=explain,
+    )
 
     result = {
         'field': row[0],
