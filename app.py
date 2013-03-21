@@ -2,6 +2,7 @@
 # -*- coding: iso-8859-15 -*-
 from datetime import datetime
 from flask import Flask, abort, make_response, request, jsonify
+from flask.ext.jsonpify import jsonify as jsonifyp
 from flask import __version__ as flask_version
 
 import conf
@@ -39,7 +40,7 @@ def buffer_value_at_point():
     if explanation:
         result['explanation'] = explanation
    
-    return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+    return jsonify(result) if not jsonp else jsonifyp(result, jsonp=jsonp)
 
 
 @app.route('/point')
@@ -69,7 +70,7 @@ def value_at_point():
     if explanation:
         result['explanation'] = explanation
    
-    return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+    return jsonify(result) if not jsonp else jsonifyp(result, jsonp=jsonp)
 
 
 @app.route('/point_in_polygon')
@@ -97,7 +98,7 @@ def value_point_in_pol():
     }
     if explanation:
         result['explanation'] = explanation
-    return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+    return jsonify(result) if not jsonp else jsonifyp(result, jsonp=jsonp)
 
 
 @app.errorhandler(400)
