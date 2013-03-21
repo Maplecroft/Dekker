@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 import psycopg2
+import decimal
 
 import conf
 
@@ -11,7 +12,6 @@ CREATE TEMP TABLE tmp_points ("gid" int, "point" geometry);
 INSERT INTO tmp_points ("gid", "point") VALUES
     <<VALUES_STATEMENTS>>
 """
-
 
 BUFFER_QUERY_SQL_201 = """
 SELECT
@@ -41,7 +41,6 @@ GROUP BY filename, gid, lon, lat
 ORDER BY filename, gid, lon, lat;
 """
 
-
 POINT_QUERY_SQL = """
 SELECT
     %s AS lon,
@@ -53,6 +52,11 @@ WHERE ST_Intersects(ST_SetSRID(ST_MakePoint(%s, %s), 4326), rast.rast)
 AND rast.filename IN %s;
 """
 
+POINT_IN_RASTER_SQL = """
+SELECT ST_Value(rast, 1, ST_SetSRID(ST_MakePoint(%s, %s),4326) ) As b1pval
+FROM <<TABLE_NAME>>
+WHERE ST_Intersects(rast,ST_SetSRID(ST_MakePoint(%s, %s),4326));
+"""
 
 POINT_IN_POLYGON_SQL = """
 SELECT  
@@ -64,11 +68,9 @@ WHERE ST_Contains(
 ); 
 """
 
-
 GET_BUFFER_AT_POINT = """
 SELECT * from buffers_for_raster WHERE id = %s;
 """
-
 
 SET_BUFFER_AT_POINT_SQL = """
 INSERT INTO points_for_buffer(id, lat, lng, geom)
@@ -78,7 +80,6 @@ INSERT INTO buffers_for_raster(id, geom)
     SELECT id, ST_Buffer(geom, 0.2249) FROM points_for_buffer
     WHERE id = %s;
 """
-
 
 BUFFER_QUERY_SQL = """
 SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr 
@@ -156,6 +157,9 @@ def get_point_in_polygon_value(point, table, field, explain=False):
 def get_value_at_points(points, tifs=None, explain=False):
     """Get the value at the points for the tifs"""
     tifs = tifs or []
+    # special, simpler case:
+    if len(tifs) == 1 and len(points) == 1:
+        return get_value_at_point_raster(points[0], tifs[0], explain)
 
     sql = POINT_QUERY_SQL.replace(
         "<<TABLE_NAME>>",
@@ -179,6 +183,27 @@ def get_value_at_points(points, tifs=None, explain=False):
         explanation = "\n".join(explanation)
     return rows, explanation
 
+
+def get_value_at_point_raster(point, tif, explain=False):
+    sql = POINT_IN_RASTER_SQL.replace( "<<TABLE_NAME>>", tif )
+    lon = point[0]
+    lat = point[1]
+    explanation = [] if explain else False
+    try:
+        conn, cur = get_conn_cur()
+        cur.execute(sql, (lon, lat, lon, lat))
+        print cur.mogrify(sql, (lon, lat, lon, lat))
+        if explain:
+            explanation.append(
+                cur.mogrify(sql, (lon, lat, lon, lat)) )
+        r = round( decimal.Decimal(cur.fetchall()[0][0]), 2 )
+        result = [ (lon, lat, tif, r) ]
+    finally:
+        conn.close()
+    if explain:
+        explanation = "\n".join(explanation)
+    return result, explanation
+    
 
 def get_buffer_value_at_points(buf, points, tifs=None, explain=False):
     """
