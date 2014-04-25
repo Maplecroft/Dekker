@@ -83,6 +83,14 @@ INSERT INTO buffers_for_raster(id, geom)
     WHERE id = %s;
 """
 
+DELETE_BUFFER_AT_POINT_SQL = """
+DELETE FROM points_for_buffer
+      WHERE id=%s;
+
+DELETE FROM buffers_for_raster
+      WHERE id=%s;
+"""
+
 
 BUFFER_QUERY_SQL = """
 SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr
@@ -242,11 +250,12 @@ def set_buffer_at_point(point):
     try:
         conn, cur = get_conn_cur()
         conn.autocommit = True
-        cur.execute(GET_BUFFER_AT_POINT, (id,))
-        values = cur.fetchall()
-        if len(values) == 0:
-            # Create the buffer
-            cur.execute(SET_BUFFER_AT_POINT_SQL, (id, lat, lng, lng, lat, id))
+
+        # Delete existing buffer
+        cur.execute(DELETE_BUFFER_AT_POINT_SQL, (id, id))
+
+        # Create the buffer
+        cur.execute(SET_BUFFER_AT_POINT_SQL, (id, lat, lng, lng, lat, id))
     finally:
         conn.close()
 
