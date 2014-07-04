@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 
 @app.route('/buffer')
-def buffer_value_at_point():
+def buffer_value_at_point(custom_buffer=False):
     """View to get average value in buffer around point."""
     point_id = request.args.get('id')
     rad = request.args.get('radius')
@@ -36,6 +36,7 @@ def buffer_value_at_point():
             (lon, lat, int(point_id)),
             raster_table,
             explain=explain,
+            custom_buffer=custom_buffer
         )
         result = {
             'query': {
@@ -47,11 +48,15 @@ def buffer_value_at_point():
         }
         if explanation:
             result['explanation'] = explanation
-    except:
-        abort(500)
+    except Exception, ex:
+        return str(ex)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
+@app.route('/custombuffer')
+def custom_buffer_value_at_point():
+    # Enable custom buffer
+    return buffer_value_at_point(custom_buffer=True)
 
 @app.route('/point')
 def value_at_point():
