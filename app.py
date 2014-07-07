@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
+import re
 from datetime import datetime
 from flask import Flask, abort, make_response, request, jsonify
 from flask import __version__ as flask_version
@@ -9,6 +10,7 @@ from utils import (
     get_value_at_points,
     get_buffer_value_at_point,
     get_point_in_polygon_value,
+    get_buffer_value_at_polygon,
 )
 
 app = Flask(__name__)
@@ -58,6 +60,48 @@ def custom_buffer_value_at_point():
     # Enable custom buffer
     return buffer_value_at_point(custom_buffer=True)
 
+@app.route('/polygon')
+def value_at_polygon():
+    point_id = request.args.get('id')
+    raster_table = request.args.get('raster_table')
+    jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
+    explain = request.args.get('explain', False) == 'true'
+    geom = request.args.get('geom')
+
+    if not geom:
+        return jsonify({}, jsonp=jsonp)
+
+    # Check polygon syntax
+    rx = re.compile("POLYGON\(\((?P<point>(-?\d+(?:\.\d+)? -?\d+(?:\.\d+)?)(?:, ?)?)+\)\)")
+    if not rx.match(geom):
+        abort(400)
+
+    start = datetime.now()
+    result = {}
+    try:
+        row, explanation = get_buffer_value_at_polygon(
+            point_id,
+            geom,
+            raster_table,
+            explain=explain
+        )
+        result = {
+            'query': {
+                'value': row[0][1],
+                'id': row[0][0],
+                'raster': raster_table,
+            },
+            'time': (datetime.now() - start).total_seconds(),
+        }
+        if explanation:
+            result['explanation'] = explanation
+    except Exception, ex:
+        return str(ex)
+
+    return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+
+
 @app.route('/point')
 def value_at_point():
     """Get the value at a lon, lat for a given view."""
@@ -86,6 +130,8 @@ def value_at_point():
         result['explanation'] = explanation
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+
 
 
 @app.route('/point_in_polygon')

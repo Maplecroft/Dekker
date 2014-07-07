@@ -30,26 +30,33 @@ GET_BUFFER_AT_POINT = """
 SELECT * from buffers_for_raster WHERE id = %s;
 """
 
+SET_BUFFER_GEOM_SQL = """
+INSERT INTO points_for_buffer(id, geom_or_poly)
+    VALUES(%%s, ST_GeomFromText('%s', 4326));
+"""
 
-SET_BUFFER_AT_POINT_SQL = """
-INSERT INTO points_for_buffer(id, lat, lng, geom)
-    VALUES(%s, %s, %s, ST_GeomFromText('POINT(%s %s)', 4326));
-
+SET_BUFFER_AT_POINT_SQL = SET_BUFFER_GEOM_SQL + """
 INSERT INTO buffers_for_raster(id, geom)
-    SELECT id, ST_Buffer(geom, %s) FROM points_for_buffer
-    WHERE id = %s;
+    SELECT id, ST_Buffer(geom_or_poly, %%s) FROM points_for_buffer
+    WHERE id = %%s;
+"""
+
+SET_BUFFER_AT_POLYGON_SQL = SET_BUFFER_GEOM_SQL + """
+INSERT INTO buffers_for_raster(id, geom)
+    SELECT id, geom_or_poly FROM points_for_buffer
+    WHERE id = %%s;
 """
 
 SET_CUSTOM_BUFFER_AT_POINT_SQL = """
-INSERT INTO points_for_buffer(id, lat, lng, geog)
-    VALUES(%s, %s, %s, ST_GeogFromText('SRID=4326;POINT(%s %s)'));
+INSERT INTO points_for_buffer(id, geog)
+    VALUES(%%s, ST_GeogFromText('SRID=4326;%s'));
 
 INSERT INTO buffers_for_raster(id, geog)
-    SELECT id, ST_Buffer(geog, %s) FROM points_for_buffer
-    WHERE id = %s;
+    SELECT id, ST_Buffer(geog, %%s) FROM points_for_buffer
+    WHERE id = %%s;
 """
 
-DELETE_BUFFER_AT_POINT_SQL = """
+DELETE_BUFFER_AT_GEOM_SQL = """
 DELETE FROM points_for_buffer
       WHERE id=%s;
 
@@ -159,9 +166,7 @@ def get_value_at_points(conn, cur, points, tifs=None, explain=False):
 
 @with_connection
 def set_buffer_at_point(conn, cur, point, buf=25, custom_buffer=False):
-    """
-    Checks if a buffer geometry exists for the current point and if not
-    it creates it.
+    """ Creates a buffer geometry instance for the given point
     """
 
     #  Hard lock at a 25km buffer, specified here as Geometry value
@@ -181,13 +186,53 @@ def set_buffer_at_point(conn, cur, point, buf=25, custom_buffer=False):
     conn.autocommit = True
 
     # Delete existing buffer
-    cur.execute(DELETE_BUFFER_AT_POINT_SQL, (id, id))
+    cur.execute(DELETE_BUFFER_AT_GEOM_SQL, (id, id))
+
+    # Set our query type to geometry/geography as needed
+    query_string = SET_BUFFER_AT_POINT_SQL
+    if custom_buffer:
+        query_string = SET_CUSTOM_BUFFER_AT_POINT_SQL
+
+    # Set our geometry to a be a single point
+    query_string = query_string % "POINT(%s %s)"
 
     # Create the buffer
-    if custom_buffer:
-        cur.execute(SET_CUSTOM_BUFFER_AT_POINT_SQL, (id, lat, lng, lng, lat, buf, id))
-    else:
-        cur.execute(SET_BUFFER_AT_POINT_SQL, (id, lat, lng, lng, lat, buf, id))
+    cur.execute(query_string, (id, lng, lat, buf, id))
+
+@with_connection
+def set_buffer_at_polygon(conn, cur, point_id, polygon):
+    """ Creates a buffer geometry instance for the given polygon
+    """
+
+    conn.autocommit = True
+
+    # Delete existing buffer
+    cur.execute(DELETE_BUFFER_AT_GEOM_SQL, (point_id, point_id))
+
+    # Set our query type to geometry/geography as needed
+    query_string = SET_BUFFER_AT_POLYGON_SQL
+
+    # Set our geometry to a be a polygon point
+    query_string = query_string % polygon
+
+    # Create the buffer
+    cur.execute(query_string, (point_id, point_id))
+
+@with_connection
+def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster, explain=False):
+    """
+    """
+    set_buffer_at_polygon(point_id, polygon)
+
+    sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+    explanation = False
+    cur.execute(sql, (point_id,))
+
+    if explain:
+        explanation = cur.mogrify(sql, (point_id,))
+
+    return cur.fetchall(), explanation
+
 
 @with_connection
 def get_buffer_value_at_point(conn, cur, buf, point, raster, explain=False, custom_buffer=False):
