@@ -19,7 +19,7 @@ app = Flask(__name__)
 @app.route('/buffer')
 def buffer_value_at_point(custom_buffer=False):
     """View to get average value in buffer around point."""
-    point_id = request.args.get('id')
+    point_id = request.args.get('id') or 999
     rad = request.args.get('radius')
     lon = request.args.get('lon')
     lat = request.args.get('lat')
@@ -51,7 +51,7 @@ def buffer_value_at_point(custom_buffer=False):
         if explanation:
             result['explanation'] = explanation
     except Exception, ex:
-        return str(ex)
+        return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
@@ -62,7 +62,7 @@ def custom_buffer_value_at_point():
 
 @app.route('/polygon')
 def value_at_polygon():
-    point_id = request.args.get('id')
+    point_id = request.args.get('id') or 999
     raster_table = request.args.get('raster_table')
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
     explain = request.args.get('explain', False) == 'true'
@@ -96,7 +96,7 @@ def value_at_polygon():
         if explanation:
             result['explanation'] = explanation
     except Exception, ex:
-        return str(ex)
+        return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
