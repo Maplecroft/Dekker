@@ -121,4 +121,7 @@ def bad_request(error):
 
 if __name__ == '__main__':
     app.debug = conf.DEBUG
-    app.run()
+    if app.debug:
+        app.run(host="0.0.0.0")
+    else:
+        app.run()
