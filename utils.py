@@ -11,7 +11,7 @@ SELECT
     %s AS lat,
     rast.filename,
     ST_Value(rast.rast, ST_SetSRID(ST_Make#Point(%s, %s), 4326))
-FROM <<TABLE_NAME>> AS rast
+FROM "<<TABLE_NAME>>" AS rast
 WHERE ST_Intersects(ST_SetSRID(ST_MakePoint(%s, %s), 4326), rast.rast)
 AND rast.filename IN %s;
 """
@@ -19,7 +19,7 @@ AND rast.filename IN %s;
 POINT_IN_POLYGON_SQL = """
 SELECT
     <<FIELD>>
-FROM <<TABLE_NAME>>
+FROM "<<TABLE_NAME>>"
 WHERE ST_Contains(
     geom,
     ST_GeomFromText('POINT(%s %s)', 4326)
@@ -67,9 +67,9 @@ DELETE FROM buffers_for_raster
 BUFFER_QUERY_SQL = """
 SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr
 FROM (
-    SELECT b.id, ST_Intersection(<<TABLE_NAME>>.rast, b.geom) AS geomval
-    FROM <<TABLE_NAME>>, buffers_for_raster b
-    WHERE ST_Intersects(b.geom, <<TABLE_NAME>>.rast)
+    SELECT b.id, ST_Intersection("<<TABLE_NAME>>".rast, b.geom) AS geomval
+    FROM "<<TABLE_NAME>>", buffers_for_raster b
+    WHERE ST_Intersects(b.geom, "<<TABLE_NAME>>".rast)
 ) AS foo
 WHERE id = %s
 GROUP BY id
@@ -79,9 +79,9 @@ ORDER BY id;
 CUSTOM_BUFFER_QUERY_SQL = """
 SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr
 FROM (
-    SELECT b.id, ST_Intersection(<<TABLE_NAME>>.rast, b.geog::geometry) AS geomval
-    FROM <<TABLE_NAME>>, buffers_for_raster b
-    WHERE ST_Intersects(b.geog::geometry, <<TABLE_NAME>>.rast)
+    SELECT b.id, ST_Intersection("<<TABLE_NAME>>".rast, b.geog::geometry) AS geomval
+    FROM "<<TABLE_NAME>>", buffers_for_raster b
+    WHERE ST_Intersects(b.geog::geometry, "<<TABLE_NAME>>".rast)
 ) AS foo
 WHERE id = %s
 GROUP BY id
