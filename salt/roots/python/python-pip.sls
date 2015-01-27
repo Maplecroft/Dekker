@@ -7,12 +7,12 @@
 
 requirements-file:
   file.exists:
-    - name: /vagrant/requirements/development.txt
+    - name: /vagrant/requirements/{{ pillar.get('requirements', '') }}.txt
 
 dekker-reqs:
   pip.installed:
     - pip_exists_action: switch
-    - requirements: /vagrant/requirements/development.txt
+    - requirements: /vagrant/requirements/{{ pillar.get('requirements', '') }}.txt
     - find_links: http://sw-srv.maplecroft.com/deployment_libs
     - cwd: /opt/envs/dekker
     - pip_bin: /opt/envs/dekker/bin/pip

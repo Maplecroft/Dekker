@@ -1,2 +1,4 @@
 # Include base.txt requirements
 -r base.txt
+
+Werkzeug==0.8.3

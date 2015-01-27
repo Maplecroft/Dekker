@@ -29,5 +29,11 @@ Vagrant.configure("2") do |config|
     # This outputs debug data to the console, for testing purposes.
     # Set this to false when not needed.
     salt.verbose = true
+
+    # Export filename for requirements
+    salt.pillar({
+      "requirements" => "development"
+    })
+
   end
 end
