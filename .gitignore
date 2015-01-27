@@ -1,4 +1,5 @@
 .idea/
+dbdump/
 *.pyc
 conf.py
 *.swp
