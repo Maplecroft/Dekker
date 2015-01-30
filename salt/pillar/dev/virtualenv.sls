@@ -1,0 +1,1 @@
+virtualenv: /home/vagrant/.virtualenvs/dekker

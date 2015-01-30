@@ -9,31 +9,37 @@ Vagrant.configure("2") do |config|
   # Download URL for the container
   config.vm.box_url = "https://vagrantcloud.com/fgrehm/boxes/trusty64-lxc"
 
-  # Provision box with masterless salt
+  # Mount the salt roots/pillar folders so that they can all be served by salt
+  config.vm.synced_folder "salt/roots/", "/srv/salt/roots"
+  config.vm.synced_folder "salt/pillar/", "/srv/salt/pillar"
+
+  # Set up masterless salt on the box with the salt provisioner
   config.vm.provision :salt do |salt|
 
-    # Set the location of the minion config, this is the relative path
-    # on the host machine, not the guest
-    salt.minion_config = "salt/minion.conf"
+    # Let the salt provisioner to its thing and add the minion config file
+    salt.minion_config = "salt/minion"
 
-    # This runs state.highstate on provisioning which installs packages,
-    # services, etc if they are not present on the VM but are listed in
-    # the state files
-    salt.run_highstate = true
+    # We don't want to run state.highstate, we will manually call highstate
+    # with the shell later to we can pass in our env=dev argument
+    salt.run_highstate = false
 
     # Set salt.install to git so we can explicitly say which version to install
     # Default installs latest but it's better to be in control of any upgrades
     salt.install_type = "git"
     salt.install_args = "v2014.7.1"
 
-    # This outputs debug data to the console, for testing purposes.
-    # Set this to false when not needed.
-    salt.verbose = true
+  end
 
-    # Export filename for requirements
-    salt.pillar({
-      "requirements" => "development"
-    })
+  # Use the shell provisioner to run `salt-call` to install our deps
+  config.vm.provision :shell do |shell|
+
+    # Stop vagrant from replacing the stdout colours
+    shell.keep_color = true
+
+    # The `env=dev` argument tells salt that we want to use our
+    # developer environment
+    shell.inline = "sudo salt-call state.highstate saltenv=dev"
 
   end
+
 end

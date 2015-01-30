@@ -1,0 +1,2 @@
+requirements_dir: /vagrant/requirements
+requirements_file: development

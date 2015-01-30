@@ -1,4 +1,0 @@
-base:
-  '*':
-    - postgresql.postgis
-    - python
