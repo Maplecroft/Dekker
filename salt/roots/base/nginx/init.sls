@@ -1,8 +1,17 @@
+include:
+  - supervisord
+
 nginx:
   pkg:
     - installed
   service:
     - running
+    - enable: True
+    - restart: True
+    - watch:
+      - file: /etc/nginx/sites-enabled/dekker.conf
+      - file: /etc/nginx/sites-enabled/default
+      - pkg: nginx
 
 # Remove default nginx site
 /etc/nginx/sites-enabled/default:
@@ -23,11 +32,19 @@ nginx:
 /etc/nginx/sites-available/dekker.conf:
   file.managed:
     - source: salt://nginx/dekker.conf
+    - template: jinja
     - require:
       - pkg: nginx
 
-service nginx reload:
-  cmd.run:
-    - watch:
-      - file: /etc/nginx/sites-enabled/dekker.conf
-      - file: /etc/nginx/sites-enabled/default
+#supervisord-nginx:
+#  supervisord.running:
+#    - name: nginx
+#    - user: root
+#    - update: True
+#    - restart: True
+#    - require:
+#      - pkg: supervisor
+#      - file: /etc/supervisor/supervisord.conf
+#    - watch:
+ #     - file: /etc/nginx/sites-enabled/dekker.conf
+ #     - file: /etc/nginx/sites-enabled/default

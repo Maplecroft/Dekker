@@ -1,2 +1,2 @@
 include:
-  - app
+  - dekker.app

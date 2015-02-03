@@ -1,5 +1,5 @@
 dekker source:
   file.symlink:
     - name: {{ pillar['dekker_source_dir'] }}
-    - target: /vagrant/app
+    - target: /vagrant
     - makedirs: True

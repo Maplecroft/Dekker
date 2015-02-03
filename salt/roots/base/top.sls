@@ -2,14 +2,18 @@ dev:
   '*':
     - user
     - postgresql.postgis
-    - nginx
-    - python
     - dekker
+    - python
+    - supervisord
+    - nginx
+    - gunicorn
 
 prod:
   '*':
     - user
     - postgresql.postgis
-    - nginx
-    - python
     - dekker
+    - python
+    - supervisord
+    - nginx
+    - gunicorn

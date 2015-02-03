@@ -1,11 +1,16 @@
-{{ pillar['virtualenv'] }}:
+dekker-virtualenv:
   virtualenv.managed:
+    - name: {{ pillar['virtualenv'] }}
     - no_site_packages: True
     - cwd: {{ pillar['virtualenv'] }}
     - user: {{ pillar['user'] }}
     - require:
       - user: {{ pillar['user'] }}
       - pkg: python-pkgs
+
+dekker-reqs-file:
+  file.exists:
+    - name: {{ pillar['requirements_dir'] }}/{{ pillar['requirements_file'] }}.txt
 
 dekker-reqs:
   pip.installed:
@@ -16,7 +21,5 @@ dekker-reqs:
     - pip_bin: {{ pillar['virtualenv'] }}/bin/pip
     - bin_env: {{ pillar['virtualenv'] }}
     - requires:
-      - file: {{ pillar['requirements_dir'] }}/{{ pillar['requirements_file'] }}.txt
-
-  file.exists:
-    - name: {{ pillar['requirements_dir'] }}/{{ pillar['requirements_file'] }}.txt
+      - file: {{ pillar['dekker_source_dir'] }}
+      - file: dekker-reqs-file

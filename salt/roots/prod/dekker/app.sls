@@ -1,4 +1,5 @@
 dekker source:
-  - require:
+  file.symlink:
     - name: {{ pillar['dekker_source_dir'] }}
-    - file.exists: /
+    - target: /vagrant
+    - makedirs: True
