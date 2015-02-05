@@ -13,6 +13,8 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder "salt/roots/", "/srv/salt/roots"
   config.vm.synced_folder "salt/pillar/", "/srv/salt/pillar"
 
+  config.vm.network :forwarded_port, guest: 80, host: 8080
+
   # Set up masterless salt on the box with the salt provisioner
   config.vm.provision :salt do |salt|
 

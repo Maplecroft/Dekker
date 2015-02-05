@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
-
 import psycopg2
 
-import conf
+from app import conf
 
 
 TEMP_TABLE_SQL = """
@@ -31,11 +30,11 @@ FROM (
         sn.filename,
         ST_Intersection(
             ST_Transform(sn.rast, 97099, 'Bilinear'),
-            ST_Buffer(ST_Transform(ST_SetSRID(p.point, %s), 97099), %s)
+            ST_Buffer(ST_Transform(ST_SetSPATIAL_REFERENCE_ID(p.point, %s), 97099), %s)
         ) AS gv
     FROM <<TABLE_NAME>> sn, tmp_points p
     WHERE ST_Intersects(
-        ST_Buffer(ST_Transform(ST_SetSRID(p.point, %s), 97099), %s),
+        ST_Buffer(ST_Transform(ST_SetSPATIAL_REFERENCE_ID(p.point, %s), 97099), %s),
         ST_Transform(sn.rast, 97099, 'Bilinear')
     )
     <<AND_STATEMENTS>>
@@ -51,9 +50,9 @@ SELECT
     %s AS lon,
     %s AS lat,
     rast.filename,
-    ST_Value(rast.rast, ST_SetSRID(ST_MakePoint(%s, %s), 4326))
+    ST_Value(rast.rast, ST_SetSPATIAL_REFERENCE_ID(ST_MakePoint(%s, %s), 4326))
 FROM <<TABLE_NAME>> AS rast
-WHERE ST_Intersects(ST_SetSRID(ST_MakePoint(%s, %s), 4326), rast.rast)
+WHERE ST_Intersects(ST_SetSPATIAL_REFERENCE_ID(ST_MakePoint(%s, %s), 4326), rast.rast)
 AND rast.filename IN %s;
 """
 
@@ -202,7 +201,7 @@ def get_buffer_value_at_points(buf, points, tifs=None, explain=False):
         points = [(n, p[0], p[1]) for n, p in enumerate(points)]
 
     sql, values = get_points_table(points)
-    values.extend([conf.SRID, buf_degrees, conf.SRID, buf_degrees])
+    values.extend([conf.SPATIAL_REFERENCE_ID, buf_degrees, conf.SPATIAL_REFERENCE_ID, buf_degrees])
     stmts.append(sql)
 
     and_stmt = ""

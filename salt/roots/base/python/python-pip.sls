@@ -10,12 +10,12 @@ dekker-virtualenv:
 
 dekker-reqs-file:
   file.exists:
-    - name: {{ pillar['requirements_dir'] }}/{{ pillar['requirements_file'] }}.txt
+    - name: {{ pillar['requirements_dir'] }}/{{ pillar['env'] }}.txt
 
 dekker-reqs:
   pip.installed:
     - pip_exists_action: switch
-    - requirements: {{ pillar['requirements_dir'] }}/{{ pillar['requirements_file'] }}.txt
+    - requirements: {{ pillar['requirements_dir'] }}/{{ pillar['env'] }}.txt
     - find_links: http://sw-srv.maplecroft.com/deployment_libs
     - cwd: {{ pillar['virtualenv'] }}
     - pip_bin: {{ pillar['virtualenv'] }}/bin/pip

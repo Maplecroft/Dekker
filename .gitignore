@@ -2,5 +2,6 @@
 dbdump/
 *.pyc
 conf.py
+config.py
 *.swp
 *.swo

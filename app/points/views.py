@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 from datetime import datetime
-from flask import Flask, abort, make_response, request, jsonify
+
+from flask import abort, request, jsonify
 from flask import __version__ as flask_version
 
-import conf
-from utils import (
+from app import app
+
+from .utils import (
     get_value_at_points,
     get_buffer_value_at_point,
     get_point_in_polygon_value,
 )
-
-app = Flask(__name__)
 
 
 @app.route('/buffer')
@@ -110,18 +110,3 @@ def value_point_in_pol():
     if explanation:
         result['explanation'] = explanation
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
-
-
-@app.errorhandler(400)
-def bad_request(error):
-    resp = make_response('lon, lat, and tif are all required parameters', 400)
-    resp.headers['Content-Type'] = 'text/plain'
-    return resp
-
-
-if __name__ == '__main__':
-    app.debug = conf.DEBUG
-    if app.debug:
-        app.run(host="0.0.0.0")
-    else:
-        app.run()

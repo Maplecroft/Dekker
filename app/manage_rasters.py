@@ -1,10 +1,6 @@
-#!/usr/bin/env python
-# -*- coding: iso-8859-15 -*-
 import argparse
 import os
-
-import conf
-
+import config
 
 def prepare_table():
     """Sets up the table in the database"""
@@ -13,8 +9,9 @@ def prepare_table():
     # So mkdir a directory so that the raster2pgsql is happy (it
     # thinks that is a raster, so it will make a table correctly.)
     # Bit odd, and probably the wrong way to do it....
-    cmd = "mkdir %s; raster2pgsql -p -I -F %s | psql %s; rmdir %s" % (
-        conf.TABLE, conf.TABLE, conf.DBNAME, conf.TABLE)
+    cmd = "mkdir {0}; raster2pgsql -p -I -F {0} | psql {1}; rmdir {0}".format(
+        config.DATABASE['table'], config.DATABASE['name']
+    )
     print cmd
     os.system(cmd)
 
