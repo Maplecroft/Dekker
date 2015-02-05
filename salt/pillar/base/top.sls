@@ -1,6 +1,7 @@
 dev:
   '*':
     - source
+    - environment
     - requirements
     - user
     - virtualenv
@@ -9,6 +10,7 @@ dev:
 prod:
   '*':
     - source
+    - environment
     - requirements
     - user
     - virtualenv

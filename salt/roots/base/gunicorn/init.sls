@@ -1,3 +1,9 @@
+/var/log/gunicorn:
+  file.directory:
+    - user: {{ pillar['user'] }}
+    - group: {{ pillar['user'] }}
+    - mode: 755
+
 {{ pillar['gunicorn_conf'] }}:
   file.managed:
     - source: salt://gunicorn/gunicorn.conf
