@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 from datetime import datetime
+import logging
+
 from flask import Flask, abort, make_response, request, jsonify
 from flask import __version__ as flask_version
 
@@ -12,6 +14,15 @@ from utils import (
 )
 
 app = Flask(__name__)
+
+
+@app.before_first_request
+def setup_logging():
+    if not app.debug:
+        # In production mode, add log handler to sys.stderr
+        # app is internal so we want debug level logging
+        app.logger.addHandler(logging.StreamHandler())
+        app.logger.setLevel(logging.DEBUG)
 
 
 @app.route('/buffer')
@@ -121,7 +132,4 @@ def bad_request(error):
 
 if __name__ == '__main__':
     app.debug = conf.DEBUG
-    if app.debug:
-        app.run(host="0.0.0.0")
-    else:
-        app.run()
+    app.run(debug=conf.DEBUG)
