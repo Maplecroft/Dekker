@@ -4,6 +4,7 @@ include:
 {{ pillar['user'] }}:
   user.present:
     - home: /home/{{ pillar['user'] }}
+
     - groups:
       - supervisor
     {% if pillar.get('uid', '') and pillar.get('gid', '') %}

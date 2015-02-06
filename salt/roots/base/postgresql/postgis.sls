@@ -9,18 +9,18 @@ postgis-pkgs:
     - require:
       - pkg: postgresql
 
-rasters-postgis:
+postgis-extension:
   postgres_extension.present:
     - name: postgis
-    - maintenance_db: rasters
+    - maintenance_db: {{ pillar['db_name'] }}
     - requires:
-      - postgres_database: rasters-db
+      - postgres_database: postgresql-db
       - pkg: postgis-pkgs
 
 rasters-postgis_topology:
   postgres_extension.present:
     - name: postgis_topology
-    - maintenance_db: rasters
+    - maintenance_db: {{ pillar['db_name'] }}
     - requires:
-      - postgres_database: rasters-db
+      - postgres_database: postgresql-db
       - pkg: postgis-pkgs

@@ -4,8 +4,7 @@ include:
 nginx:
   pkg:
     - installed
-  service:
-    - running
+  service.running:
     - enable: True
     - restart: True
     - watch:
@@ -35,16 +34,3 @@ nginx:
     - template: jinja
     - require:
       - pkg: nginx
-
-#supervisord-nginx:
-#  supervisord.running:
-#    - name: nginx
-#    - user: root
-#    - update: True
-#    - restart: True
-#    - require:
-#      - pkg: supervisor
-#      - file: /etc/supervisor/supervisord.conf
-#    - watch:
- #     - file: /etc/nginx/sites-enabled/dekker.conf
- #     - file: /etc/nginx/sites-enabled/default

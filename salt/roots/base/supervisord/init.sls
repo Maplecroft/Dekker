@@ -10,12 +10,6 @@
     - makedirs: True
     - template: jinja
 
-/etc/supervisor/conf.d/nginx.conf:
-  file.managed:
-    - source: salt://supervisord/nginx.conf
-    - makedirs: True
-    - template: jinja
-
 supervisor:
   pkg:
     - installed

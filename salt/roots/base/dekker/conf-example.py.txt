@@ -1,0 +1,8 @@
+DBNAME = "{{ pillar['db_name'] }}"
+HOST = "localhost"
+TABLE = "{{ pillar['db_table_name'] }}"
+USER = "{{ pillar['user'] }}"
+PASSWORD = "{{ pillar['db_password'] }}"
+SRID = 4326
+
+DEBUG = {% if pillar['environment'] == 'development' %}True{% else %}False{% endif %}

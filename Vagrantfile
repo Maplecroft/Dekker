@@ -41,7 +41,7 @@ Vagrant.configure("2") do |config|
 
     # The `env=dev` argument tells salt that we want to use our
     # developer environment
-    shell.inline = "sudo salt-call state.highstate saltenv=dev"
+    shell.inline = "sudo salt-call state.highstate saltenv=prod"
 
   end
 

@@ -1,6 +1,8 @@
 dev:
   '*':
     - source
+    - database
+    - role
     - environment
     - requirements
     - user
@@ -10,6 +12,8 @@ dev:
 prod:
   '*':
     - source
+    - database
+    - role
     - environment
     - requirements
     - user

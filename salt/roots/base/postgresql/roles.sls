@@ -3,17 +3,17 @@ include:
 
 dekker-role:
   postgres_user.present:
-    - name: {{ pillar['user'] }}
+    - name: {{ pillar['db_name'] }}
     - runas: postgres
-    - password: somesecretpassword
+    - password: {{ pillar['db_password'] }}
     - superuser: True
     - require:
       - service: postgresql
       - cmd: /var/lib/postgresql/configure_utf-8.sh
 
-rasters-db:
+postgresql-db:
   postgres_database.present:
-    - name: rasters
+    - name: {{ pillar['db_name'] }}
     - runas: postgres
     - encoding: UTF8
     - lc_ctype: en_GB.UTF-8

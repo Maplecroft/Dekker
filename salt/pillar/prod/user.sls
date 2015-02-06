@@ -1,3 +1,4 @@
 user: dekker
-#uid: 1000
-#gid: 1000
+password: notrealpassword
+uid: 1000
+gid: 1000
