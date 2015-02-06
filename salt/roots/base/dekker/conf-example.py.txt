@@ -5,4 +5,4 @@ USER = "{{ pillar['user'] }}"
 PASSWORD = "{{ pillar['db_password'] }}"
 SRID = 4326
 
-DEBUG = {% if pillar['environment'] == 'development' %}True{% else %}False{% endif %}
+DEBUG = {% if pillar['env'] == 'development' %}True{% else %}False{% endif %}
