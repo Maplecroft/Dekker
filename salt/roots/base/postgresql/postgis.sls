@@ -12,8 +12,7 @@ postgis-pkgs:
 rasters-postgis:
   postgres_extension.present:
     - name: postgis
-    - maintainance_db: rasters
-    - user: postgres
+    - maintenance_db: rasters
     - requires:
       - postgres_database: rasters-db
       - pkg: postgis-pkgs
@@ -21,8 +20,7 @@ rasters-postgis:
 rasters-postgis_topology:
   postgres_extension.present:
     - name: postgis_topology
-    - maintainance_db: rasters
-    - user: postgres
+    - maintenance_db: rasters
     - requires:
       - postgres_database: rasters-db
       - pkg: postgis-pkgs
