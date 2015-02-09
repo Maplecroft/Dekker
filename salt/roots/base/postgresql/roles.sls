@@ -3,7 +3,7 @@ include:
 
 dekker-role:
   postgres_user.present:
-    - name: {{ pillar['db_name'] }}
+    - name: {{ pillar['db_role'] }}
     - runas: postgres
     - password: {{ pillar['db_password'] }}
     - superuser: True
@@ -18,6 +18,6 @@ postgresql-db:
     - encoding: UTF8
     - lc_ctype: en_GB.UTF-8
     - lc_collate: en_GB.UTF-8
-    - owner: {{ pillar['user'] }}
+    - owner: {{ pillar['db_role'] }}
     - require:
       - postgres_user: dekker-role

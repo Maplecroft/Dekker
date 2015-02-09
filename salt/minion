@@ -4,21 +4,21 @@ file_client: local
 ## Location of salt states for each environment
 file_roots:
   base:
-    - /srv/salt/roots/base
+    - /srv/www/dekker/salt/roots/base
   prod:
-    - /srv/salt/roots/prod
-    - /srv/salt/roots/base
+    - /srv/www/dekker/salt/roots/prod
+    - /srv/www/dekker/salt/roots/base
   dev:
-    - /srv/salt/roots/dev
-    - /srv/salt/roots/base
+    - /srv/www/dekker/salt/roots/dev
+    - /srv/www/dekker//salt/roots/base
 
 ## Location of pillar files for each environment
 pillar_roots:
   base:
-    - /srv/salt/pillar/base
+    - /srv/www/dekker/salt/pillar/base
   prod:
-    - /srv/salt/pillar/prod
-    - /srv/salt/pillar/base
+    - /srv/www/dekker/salt/pillar/prod
+    - /srv/www/dekker/salt/pillar/base
   dev:
-    - /srv/salt/pillar/dev
-    - /srv/salt/pillar/base
+    - /srv/www/dekker/salt/pillar/dev
+    - /srv/www/dekker/salt/pillar/base

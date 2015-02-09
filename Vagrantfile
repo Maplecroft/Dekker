@@ -10,8 +10,7 @@ Vagrant.configure("2") do |config|
   config.vm.box_url = "https://vagrantcloud.com/fgrehm/boxes/trusty64-lxc"
 
   # Mount the salt roots/pillar folders so that they can all be served by salt
-  config.vm.synced_folder "salt/roots/", "/srv/salt/roots"
-  config.vm.synced_folder "salt/pillar/", "/srv/salt/pillar"
+  config.vm.synced_folder ".", "/srv/www/dekker"
 
   # Port forwarding for dekker service
   config.vm.network :forwarded_port, guest: 80, host: 8080
