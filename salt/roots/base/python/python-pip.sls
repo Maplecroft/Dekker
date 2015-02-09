@@ -16,7 +16,7 @@ dekker-reqs:
   pip.installed:
     - pip_exists_action: switch
     - requirements: {{ pillar['requirements_dir'] }}/{{ pillar['env'] }}.txt
-    - find_links: http://sw-srv.maplecroft.com/deployment_libs
+    - find_links: http://scratch.maplecroft.com/deployment_libs
     - cwd: {{ pillar['virtualenv'] }}
     - pip_bin: {{ pillar['virtualenv'] }}/bin/pip
     - bin_env: {{ pillar['virtualenv'] }}
