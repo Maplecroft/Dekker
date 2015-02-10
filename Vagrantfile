@@ -40,7 +40,12 @@ Vagrant.configure("2") do |config|
 
     # The `env=dev` argument tells salt that we want to use our
     # developer environment
-    shell.inline = "sudo salt-call state.highstate saltenv=prod"
+    shell.inline = "sudo salt-call --config-dir=$1 state.highstate pillar=$2 saltenv=$3"
+    shell.args = [
+        "/srv/www/dekker/salt/",
+        "{'db_password':'vagrant','password':'dekker'}",
+        "dev"
+    ]
 
   end
 

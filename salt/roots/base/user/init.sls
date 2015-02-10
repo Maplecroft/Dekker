@@ -4,6 +4,7 @@ include:
 {{ pillar['user'] }}:
   user.present:
     - home: /home/{{ pillar['user'] }}
+    - shell: /bin/bash
     {% if pillar.get('password', '') %}
     - password: {{ pillar['password'] }}
     {% endif %}
