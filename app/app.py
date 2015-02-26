@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
+import re
 from datetime import datetime
 import logging
 
@@ -11,6 +12,7 @@ from utils import (
     get_value_at_points,
     get_buffer_value_at_point,
     get_point_in_polygon_value,
+    get_buffer_value_at_polygon,
 )
 
 app = Flask(__name__)
@@ -26,9 +28,9 @@ def setup_logging():
 
 
 @app.route('/buffer')
-def buffer_value_at_point():
+def buffer_value_at_point(custom_buffer=False):
     """View to get average value in buffer around point."""
-    point_id = request.args.get('id')
+    point_id = request.args.get('id') or 999
     rad = request.args.get('radius')
     lon = request.args.get('lon')
     lat = request.args.get('lat')
@@ -47,6 +49,7 @@ def buffer_value_at_point():
             (lon, lat, int(point_id)),
             raster_table,
             explain=explain,
+            custom_buffer=custom_buffer
         )
         result = {
             'query': {
@@ -58,10 +61,56 @@ def buffer_value_at_point():
         }
         if explanation:
             result['explanation'] = explanation
-    except:
-        abort(500)
+    except Exception, ex:
+        return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+@app.route('/custombuffer')
+def custom_buffer_value_at_point():
+    # Enable custom buffer
+    return buffer_value_at_point(custom_buffer=True)
+
+@app.route('/polygon')
+def value_at_polygon():
+    point_id = request.args.get('id') or 999
+    raster_table = request.args.get('raster_table')
+    jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
+    explain = request.args.get('explain', False) == 'true'
+    geom = request.args.get('geom')
+
+    if not geom:
+        return jsonify({}, jsonp=jsonp)
+
+    # Check polygon syntax
+    rx = re.compile("POLYGON\(\((?P<point>(-?\d+(?:\.\d+)? -?\d+(?:\.\d+)?)(?:, ?)?)+\)\)")
+    if not rx.match(geom):
+        abort(400)
+
+    start = datetime.now()
+    result = {}
+    try:
+        row, explanation = get_buffer_value_at_polygon(
+            point_id,
+            geom,
+            raster_table,
+            explain=explain
+        )
+        result = {
+            'query': {
+                'value': row[0][1],
+                'id': row[0][0],
+                'raster': raster_table,
+            },
+            'time': (datetime.now() - start).total_seconds(),
+        }
+        if explanation:
+            result['explanation'] = explanation
+    except Exception, ex:
+        return abort(400)
+
+    return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
 
 
 @app.route('/point')
@@ -92,6 +141,8 @@ def value_at_point():
         result['explanation'] = explanation
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+
 
 
 @app.route('/point_in_polygon')
