@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 
-import psycopg2
-
 import conf
+import psycopg2
 
 POINT_QUERY_SQL = """
 SELECT
@@ -44,15 +43,6 @@ INSERT INTO buffers_for_raster(id, geom)
 SET_BUFFER_AT_POLYGON_SQL = SET_BUFFER_GEOM_SQL + """
 INSERT INTO buffers_for_raster(id, geom)
     SELECT id, geom_or_poly FROM points_for_buffer
-    WHERE id = %%s;
-"""
-
-SET_CUSTOM_BUFFER_AT_POINT_SQL = """
-INSERT INTO points_for_buffer(id, geog)
-    VALUES(%%s, ST_GeogFromText('SRID=4326;%s'));
-
-INSERT INTO buffers_for_raster(id, geog)
-    SELECT id, ST_Buffer(geog, %%s) FROM points_for_buffer
     WHERE id = %%s;
 """
 
@@ -100,6 +90,7 @@ def get_conn_cur():
     cur = conn.cursor()
     return conn, cur
 
+
 def with_connection(fn):
     def wrapped(*args, **kwargs):
         connection = None
@@ -112,6 +103,7 @@ def with_connection(fn):
                 connection.close()
         return result
     return wrapped
+
 
 @with_connection
 def get_point_in_polygon_value(conn, cur, point, table, field, explain=False):
@@ -137,6 +129,7 @@ def get_point_in_polygon_value(conn, cur, point, table, field, explain=False):
     if explain:
         explanation = "\n".join(explanation)
     return row, explanation
+
 
 @with_connection
 def get_value_at_points(conn, cur, points, tifs=None, explain=False):
@@ -165,18 +158,10 @@ def get_value_at_points(conn, cur, points, tifs=None, explain=False):
 
 
 @with_connection
-def set_buffer_at_point(conn, cur, point, buf=25, custom_buffer=False):
-    """ Creates a buffer geometry instance for the given point
-    """
-
-    #  Hard lock at a 25km buffer, specified here as Geometry value
-    #  not geography value. 
-    #  buf = 25km / 111.13  # one degree ish, varying about the equator..
-    if not custom_buffer:
-        buf = 0.2249
-    else:
-        # Convert km to metres. We'll use geography rather than geometry
-        buf = buf * 1000
+def set_buffer_at_point(conn, cur, point, buf=25):
+    """ Creates a buffer geometry instance for the given point"""
+    # Convert from kms to degrees. Not perfect, but Good Enough(TM).
+    buf = buf / 111.13
 
     # point is (lng, lat, id)
     lat = float(point[1])
@@ -188,22 +173,16 @@ def set_buffer_at_point(conn, cur, point, buf=25, custom_buffer=False):
     # Delete existing buffer
     cur.execute(DELETE_BUFFER_AT_GEOM_SQL, (id, id))
 
-    # Set our query type to geometry/geography as needed
-    query_string = SET_BUFFER_AT_POINT_SQL
-    if custom_buffer:
-        query_string = SET_CUSTOM_BUFFER_AT_POINT_SQL
-
     # Set our geometry to a be a single point
-    query_string = query_string % "POINT(%s %s)"
+    query_string = SET_BUFFER_AT_POINT_SQL % "POINT(%s %s)"
 
     # Create the buffer
     cur.execute(query_string, (id, lng, lat, buf, id))
 
+
 @with_connection
 def set_buffer_at_polygon(conn, cur, point_id, polygon):
-    """ Creates a buffer geometry instance for the given polygon
-    """
-
+    """Creates a buffer geometry instance for the given polygon"""
     conn.autocommit = True
 
     # Delete existing buffer
@@ -218,10 +197,10 @@ def set_buffer_at_polygon(conn, cur, point_id, polygon):
     # Create the buffer
     cur.execute(query_string, (point_id, point_id))
 
+
 @with_connection
-def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster, explain=False):
-    """
-    """
+def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
+                                explain=False):
     set_buffer_at_polygon(point_id, polygon)
 
     sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
@@ -235,14 +214,11 @@ def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster, explain=Fa
 
 
 @with_connection
-def get_buffer_value_at_point(conn, cur, buf, point, raster, explain=False, custom_buffer=False):
+def get_buffer_value_at_point(conn, cur, buf, point, raster, explain=False):
     """Get a buffer of approx bufKM around point (lon, lat) in raster."""
     # point is (lng, lat, id)
-    set_buffer_at_point(point, buf, custom_buffer=custom_buffer)
-    SQL = BUFFER_QUERY_SQL
-    if custom_buffer:
-        SQL = CUSTOM_BUFFER_QUERY_SQL
-    sql = SQL.replace("<<TABLE_NAME>>", raster)
+    set_buffer_at_point(point, buf)
+    sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
     explanation = False
     id = point[2]
     cur.execute(sql, (id,))

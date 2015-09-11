@@ -17,7 +17,8 @@ app = Flask(__name__)
 
 
 @app.route('/buffer')
-def buffer_value_at_point(custom_buffer=False):
+@app.route('/custombuffer')
+def buffer_value_at_point():
     """View to get average value in buffer around point."""
     point_id = request.args.get('id') or 999
     rad = request.args.get('radius')
@@ -38,7 +39,6 @@ def buffer_value_at_point(custom_buffer=False):
             (lon, lat, int(point_id)),
             raster_table,
             explain=explain,
-            custom_buffer=custom_buffer
         )
         result = {
             'query': {
@@ -50,15 +50,11 @@ def buffer_value_at_point(custom_buffer=False):
         }
         if explanation:
             result['explanation'] = explanation
-    except Exception, ex:
+    except Exception:
         return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
-@app.route('/custombuffer')
-def custom_buffer_value_at_point():
-    # Enable custom buffer
-    return buffer_value_at_point(custom_buffer=True)
 
 @app.route('/polygon')
 def value_at_polygon():
@@ -72,7 +68,9 @@ def value_at_polygon():
         return jsonify({}, jsonp=jsonp)
 
     # Check polygon syntax
-    rx = re.compile("POLYGON\(\((?P<point>(-?\d+(?:\.\d+)? -?\d+(?:\.\d+)?)(?:, ?)?)+\)\)")
+    rx = re.compile(
+        "POLYGON\(\((?P<point>(-?\d+(?:\.\d+)? -?\d+(?:\.\d+)?)(?:, ?)?)+\)\)"
+    )
     if not rx.match(geom):
         abort(400)
 
@@ -95,11 +93,10 @@ def value_at_polygon():
         }
         if explanation:
             result['explanation'] = explanation
-    except Exception, ex:
+    except Exception:
         return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
-
 
 
 @app.route('/point')
@@ -130,8 +127,6 @@ def value_at_point():
         result['explanation'] = explanation
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
-
-
 
 
 @app.route('/point_in_polygon')
