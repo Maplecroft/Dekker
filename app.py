@@ -11,22 +11,29 @@ from utils import (
     get_buffer_value_at_point,
     get_point_in_polygon_value,
     get_buffer_value_at_polygon,
+    get_buffer_values_at_points,
 )
 
 app = Flask(__name__)
 
 
-@app.route('/buffer')
+@app.route('/pointbuffer')
 @app.route('/custombuffer')
-def buffer_value_at_point():
+def buffer_value_at_point(rad=None, legacy=False):
     """View to get average value in buffer around point."""
     point_id = request.args.get('id') or 999
-    rad = request.args.get('radius')
+
+    try:
+        rad = rad or request.args.get('radius')
+    except:
+        abort(400)
+
     lon = request.args.get('lon')
     lat = request.args.get('lat')
     raster_table = request.args.get('raster_table')
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
     explain = request.args.get('explain', False) == 'true'
+    fixed = request.args.get('explain', False) == 'true'
 
     if not lon or not lat or not len(raster_table):
         abort(400)
@@ -34,11 +41,12 @@ def buffer_value_at_point():
     start = datetime.now()
     result = {}
     try:
-        row, explanation = get_buffer_value_at_point(
+        row, explanation = get_buffer_values_at_points(
             float(rad),
-            (lon, lat, int(point_id)),
+            [(lon, lat, int(point_id))],
             raster_table,
             explain=explain,
+            legacy=legacy,
         )
         result = {
             'query': {
@@ -54,6 +62,13 @@ def buffer_value_at_point():
         return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+
+@app.route('/buffer')
+def legacy_buffer_value_at_point():
+    """Backward consistency preservation.  Scored radius used to be
+       hard-coded at 25km for all buffer lookups regardless of arguments"""
+    return buffer_value_at_point(rad=25, legacy=True)
 
 
 @app.route('/polygon')
@@ -160,7 +175,9 @@ def value_point_in_pol():
 
 @app.errorhandler(400)
 def bad_request(error):
-    resp = make_response('lon, lat, and tif are all required parameters', 400)
+    import pudb; pudb.set_trace()
+    expected = ""
+    resp = make_response('Bad arguments provided. Expected: %s', 400)
     resp.headers['Content-Type'] = 'text/plain'
     return resp
 

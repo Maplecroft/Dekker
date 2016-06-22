@@ -4,81 +4,6 @@
 import conf
 import psycopg2
 
-POINT_QUERY_SQL = """
-SELECT
-    %s AS lon,
-    %s AS lat,
-    rast.filename,
-    ST_Value(rast.rast, ST_SetSRID(ST_Make#Point(%s, %s), 4326))
-FROM "<<TABLE_NAME>>" AS rast
-WHERE ST_Intersects(ST_SetSRID(ST_MakePoint(%s, %s), 4326), rast.rast)
-AND rast.filename IN %s;
-"""
-
-POINT_IN_POLYGON_SQL = """
-SELECT
-    <<FIELD>>
-FROM "<<TABLE_NAME>>"
-WHERE ST_Contains(
-    geom,
-    ST_GeomFromText('POINT(%s %s)', 4326)
-);
-"""
-
-GET_BUFFER_AT_POINT = """
-SELECT * from buffers_for_raster WHERE id = %s;
-"""
-
-SET_BUFFER_GEOM_SQL = """
-INSERT INTO points_for_buffer(id, geom_or_poly)
-    VALUES(%%s, ST_GeomFromText('%s', 4326));
-"""
-
-SET_BUFFER_AT_POINT_SQL = SET_BUFFER_GEOM_SQL + """
-INSERT INTO buffers_for_raster(id, geom)
-    SELECT id, ST_Buffer(geom_or_poly, %%s) FROM points_for_buffer
-    WHERE id = %%s;
-"""
-
-SET_BUFFER_AT_POLYGON_SQL = SET_BUFFER_GEOM_SQL + """
-INSERT INTO buffers_for_raster(id, geom)
-    SELECT id, geom_or_poly FROM points_for_buffer
-    WHERE id = %%s;
-"""
-
-DELETE_BUFFER_AT_GEOM_SQL = """
-DELETE FROM points_for_buffer
-      WHERE id=%s;
-
-DELETE FROM buffers_for_raster
-      WHERE id=%s;
-"""
-
-BUFFER_QUERY_SQL = """
-SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr
-FROM (
-    SELECT b.id, ST_Intersection("<<TABLE_NAME>>".rast, b.geom) AS geomval
-    FROM "<<TABLE_NAME>>", buffers_for_raster b
-    WHERE ST_Intersects(b.geom, "<<TABLE_NAME>>".rast)
-) AS foo
-WHERE id = %s
-GROUP BY id
-ORDER BY id;
-"""
-
-CUSTOM_BUFFER_QUERY_SQL = """
-SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr
-FROM (
-    SELECT b.id, ST_Intersection("<<TABLE_NAME>>".rast, b.geog::geometry) AS geomval
-    FROM "<<TABLE_NAME>>", buffers_for_raster b
-    WHERE ST_Intersects(b.geog::geometry, "<<TABLE_NAME>>".rast)
-) AS foo
-WHERE id = %s
-GROUP BY id
-ORDER BY id;
-"""
-
-
 def get_conn_cur():
     """DB setup shortcut."""
     conn = psycopg2.connect(
@@ -103,6 +28,99 @@ def with_connection(fn):
                 connection.close()
         return result
     return wrapped
+
+
+# Point scoring lookup - get a score for a point
+# against a given raster
+POINT_QUERY_SQL = """
+SELECT
+    %s AS lon,
+    %s AS lat,
+    rast.filename,
+    ST_Value(rast.rast, ST_SetSRID(ST_Make#Point(%s, %s), 4326))
+FROM "<<TABLE_NAME>>" AS rast
+WHERE ST_Intersects(ST_SetSRID(ST_MakePoint(%s, %s), 4326), rast.rast)
+AND rast.filename IN %s;
+"""
+
+# Point in polygon check
+POINT_IN_POLYGON_SQL = """
+SELECT
+    <<FIELD>>
+FROM "<<TABLE_NAME>>"
+WHERE ST_Contains(
+    geom,
+    ST_GeomFromText('POINT(%s %s)', 4326)
+);
+"""
+
+# Step 1 of buffer/polygon queries: Create an ID'd point or polygon
+# that we can create a buffer area to score from.
+SET_BUFFER_GEOM_SQL = """
+INSERT INTO points_for_buffer(id, geom_or_poly)
+    VALUES(%%s, ST_GeomFromText('%s', 4326));
+"""
+
+# Step 2.1 Bufered point queries: Create the buffer using
+# a point and a given radius using st_buffer
+SET_BUFFER_AT_POINT_SQL = SET_BUFFER_GEOM_SQL + """
+INSERT INTO buffers_for_raster(id, geom)
+    SELECT id, ST_Buffer(geom_or_poly, %%s) FROM points_for_buffer
+    WHERE id = %%s;
+"""
+
+# Step 2.2: Polygon queries: Create a buffer using
+# The polygon as it is.
+SET_BUFFER_AT_POLYGON_SQL = SET_BUFFER_GEOM_SQL + """
+INSERT INTO buffers_for_raster(id, geom)
+    SELECT id, geom_or_poly FROM points_for_buffer
+    WHERE id = %%s;
+"""
+
+
+# Step 3 of buffer/polygon point scoring.  Actually calculate
+# the score using st_clip and st_summarystats
+BUFFER_QUERY_SQL = """
+SELECT b.id, (
+      CAST((ST_SummaryStats(
+        ST_Clip("<<TABLE_NAME>>".rast, 1, b.geom, true)
+      )
+    ).mean AS decimal(9, 3))) AS avgimr
+  FROM "<<TABLE_NAME>>", buffers_for_raster b 
+   b.id IN (%s)
+   AND ST_Intersects(b.geom, "<<TABLE_NAME>>".rast);
+ ORDER BY id;
+"""
+
+# Cleanup query - deletes the buffers from dekker that
+# where added using hte above 3 queries to prevent
+# re-usage if queried with the same ID
+DELETE_BUFFER_AT_GEOM_SQL = """
+DELETE FROM points_for_buffer
+      WHERE id=%s;
+
+DELETE FROM buffers_for_raster
+      WHERE id=%s;
+"""
+
+
+# Per Step 3 above - ST_Intersection is not a good way of doing this
+# though - should use ST_clip but we started with this.  Preserverd
+# here as a legacy method for older tools where we need to preserve
+# methodology. Should be retired once all tools are killed off or
+# are re-scored using the newer methodology.  jpeel - June 2016
+LEGACY_BUFFER_QUERY_SQL = """
+SELECT id, CAST(AVG(((foo.geomval).val)) AS decimal(9,3)) as avgimr
+FROM (
+    SELECT b.id, ST_Intersection("<<TABLE_NAME>>".rast, b.geom) AS geomval
+    FROM "<<TABLE_NAME>>", buffers_for_raster b
+    WHERE ST_Intersects(b.geom, "<<TABLE_NAME>>".rast)
+) AS foo
+WHERE id = %s
+GROUP BY id
+ORDER BY id;
+"""
+
 
 
 @with_connection
@@ -160,6 +178,7 @@ def get_value_at_points(conn, cur, points, tifs=None, explain=False):
 @with_connection
 def set_buffer_at_point(conn, cur, point, buf=25):
     """ Creates a buffer geometry instance for the given point"""
+
     # Convert from kms to degrees. Not perfect, but Good Enough(TM).
     buf = buf / 111.13
 
@@ -201,8 +220,11 @@ def set_buffer_at_polygon(conn, cur, point_id, polygon):
 @with_connection
 def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
                                 explain=False):
+
+    # Create our buffer
     set_buffer_at_polygon(point_id, polygon)
 
+    # Run the query
     sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
     explanation = False
     cur.execute(sql, (point_id,))
@@ -214,16 +236,33 @@ def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
 
 
 @with_connection
-def get_buffer_value_at_point(conn, cur, buf, point, raster, explain=False):
+def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
+                                legacy=False):
     """Get a buffer of approx bufKM around point (lon, lat) in raster."""
-    # point is (lng, lat, id)
-    set_buffer_at_point(point, buf)
+
+    # Create buffers
+    for point in points:
+        set_buffer_at_point(point, buf)
+
+    # Create query
     sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
-    explanation = False
-    id = point[2]
-    cur.execute(sql, (id,))
+    ids = [str(pt[2]) for pt in points]
+
+    # Support legacy ST_intersection scoring
+    if legacy:
+        sql = LEGACY_BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+        explanation = False
+        id = point[2]
+        cur.execute(sql, (id,))
+    else:
+        # Otherwise revert to the proper way of doing it
+        sql = sql % ", ".join(ids)
+        cur.execute(sql)
+
+    # Add explanation?
     if explain:
         explanation = cur.mogrify(sql, (id,))
-    result = cur.fetchall()
 
-    return result, explanation
+    # Return results
+    result = cur.fetchall()
+    return result
