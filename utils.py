@@ -61,15 +61,7 @@ INSERT INTO points_for_buffer(id, geom_or_poly)
     VALUES(%%s, ST_GeomFromText('%s', 4326));
 """
 
-# Step 2.1 Bufered point queries: Create the buffer using
-# a point and a given radius using st_buffer
-SET_BUFFER_AT_POINT_SQL = SET_BUFFER_GEOM_SQL + """
-INSERT INTO buffers_for_raster(id, geom)
-    SELECT id, ST_Buffer(geom_or_poly, %%s) FROM points_for_buffer
-    WHERE id = %%s;
-"""
-
-# Step 2.2: Polygon queries: Create a buffer using
+# Step 2.1: Polygon queries: Create a buffer using
 # The polygon as it is.
 SET_BUFFER_AT_POLYGON_SQL = SET_BUFFER_GEOM_SQL + """
 INSERT INTO buffers_for_raster(id, geom)
@@ -77,6 +69,15 @@ INSERT INTO buffers_for_raster(id, geom)
     WHERE id = %%s;
 """
 
+# Step 2.2 Point queries - create a buffer around a point expressed
+# using metres from geography
+SET_BUFFER_AT_POINT_SQL = SET_BUFFER_GEOM_SQL + """
+INSERT INTO buffers_for_raster(id, geom)
+    SELECT id, ST_Buffer(
+        CAST(ST_SetSRID(geom_or_poly, 4326) as geography), %%s
+    )::geometry FROM points_for_buffer
+    WHERE id = %%s;
+"""
 
 # Step 3 of buffer/polygon point scoring.  Actually calculate
 # the score using st_clip and st_summarystats
@@ -86,9 +87,9 @@ SELECT b.id, (
         ST_Clip("<<TABLE_NAME>>".rast, 1, b.geom, true)
       )
     ).mean AS decimal(9, 3))) AS avgimr
-  FROM "<<TABLE_NAME>>", buffers_for_raster b 
-   b.id IN (%s)
-   AND ST_Intersects(b.geom, "<<TABLE_NAME>>".rast);
+  FROM "<<TABLE_NAME>>", buffers_for_raster b
+ WHERE b.id IN (%s)
+   AND ST_Intersects(b.geom, "<<TABLE_NAME>>".rast)
  ORDER BY id;
 """
 
@@ -103,6 +104,15 @@ DELETE FROM buffers_for_raster
       WHERE id=%s;
 """
 
+
+# Per step 2.2 Bufered point queries: buffers on points expressed
+# as degrees is not really an exact means.  We use postgis to set
+# a buffer on a bit of geography now.
+LEGACY_SET_BUFFER_AT_POINT_SQL = SET_BUFFER_GEOM_SQL + """
+INSERT INTO buffers_for_raster(id, geom)
+    SELECT id, ST_Buffer(geom_or_poly, %%s) FROM points_for_buffer
+    WHERE id = %%s;
+"""
 
 # Per Step 3 above - ST_Intersection is not a good way of doing this
 # though - should use ST_clip but we started with this.  Preserverd
@@ -120,7 +130,6 @@ WHERE id = %s
 GROUP BY id
 ORDER BY id;
 """
-
 
 
 @with_connection
@@ -176,11 +185,8 @@ def get_value_at_points(conn, cur, points, tifs=None, explain=False):
 
 
 @with_connection
-def set_buffer_at_point(conn, cur, point, buf=25):
+def set_buffer_at_point(conn, cur, point, buf=25, legacy=False):
     """ Creates a buffer geometry instance for the given point"""
-
-    # Convert from kms to degrees. Not perfect, but Good Enough(TM).
-    buf = buf / 111.13
 
     # point is (lng, lat, id)
     lat = float(point[1])
@@ -192,8 +198,28 @@ def set_buffer_at_point(conn, cur, point, buf=25):
     # Delete existing buffer
     cur.execute(DELETE_BUFFER_AT_GEOM_SQL, (id, id))
 
-    # Set our geometry to a be a single point
-    query_string = SET_BUFFER_AT_POINT_SQL % "POINT(%s %s)"
+    # Support legacy buffer setting using hard coded km -> degree calculation
+    # Bit of an odd one - for at least our test rasters, the 'legacy' path
+    # gets an identical result to that retrieved when using the below 'else'
+    # block below. If this is true for all rasters, the legacy block can be
+    # killed off.
+
+    # The same is NOT true for the reverse.  If using the Correct(TM) way of
+    # calculating buffer scores with ST_Clip, the old Good Enough(TM) conversion
+    # seems to skew the result, at least on our test raster
+    if legacy:
+        # Convert from kms to metres. Not perfect, but Good Enough(TM).
+        buf = buf / 111.13
+
+        # Set our geometry to a be a single point
+        query_string = LEGACY_SET_BUFFER_AT_POINT_SQL % "POINT(%s %s)"
+    else:
+        # Set buffer using geography and metres radius using the
+        # Correct(TM) approach
+        buf = buf * 1000
+
+        # Set our geometry to a be a single point
+        query_string = SET_BUFFER_AT_POINT_SQL % "POINT(%s %s)"
 
     # Create the buffer
     cur.execute(query_string, (id, lng, lat, buf, id))
@@ -242,7 +268,7 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
 
     # Create buffers
     for point in points:
-        set_buffer_at_point(point, buf)
+        set_buffer_at_point(point, buf, legacy=legacy)
 
     # Create query
     sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
@@ -260,9 +286,10 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
         cur.execute(sql)
 
     # Add explanation?
+    explanation = []
     if explain:
         explanation = cur.mogrify(sql, (id,))
 
     # Return results
     result = cur.fetchall()
-    return result
+    return result, explanation

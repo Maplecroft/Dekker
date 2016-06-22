@@ -8,7 +8,6 @@ from flask import __version__ as flask_version
 import conf
 from utils import (
     get_value_at_points,
-    get_buffer_value_at_point,
     get_point_in_polygon_value,
     get_buffer_value_at_polygon,
     get_buffer_values_at_points,
@@ -20,7 +19,17 @@ app = Flask(__name__)
 @app.route('/pointbuffer')
 @app.route('/custombuffer')
 def buffer_value_at_point(rad=None, legacy=False):
-    """View to get average value in buffer around point."""
+    """Get average value in buffer around point.
+
+       Expects:
+            id:           a given point id (int) - defaults to 999
+            lon:          longitude of point (float)
+            lat:          latitude of point (float)
+            rad:          radius of buffer in km (int/float)
+            raster_table: name of raster table to query. (string)
+            jsonp:        return result as jsonp function call (string)
+
+    """
     point_id = request.args.get('id') or 999
 
     try:
@@ -58,7 +67,8 @@ def buffer_value_at_point(rad=None, legacy=False):
         }
         if explanation:
             result['explanation'] = explanation
-    except Exception:
+    except Exception, ex:
+        print ex
         return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
@@ -66,13 +76,30 @@ def buffer_value_at_point(rad=None, legacy=False):
 
 @app.route('/buffer')
 def legacy_buffer_value_at_point():
-    """Backward consistency preservation.  Scored radius used to be
-       hard-coded at 25km for all buffer lookups regardless of arguments"""
+    """Get average value in buffer around point using set 25km radius.
+
+       Expects:
+            id:           a given point id (int) - defaults to 999
+            lon:          longitude of point (float)
+            lat:          latitude of point (float)
+            raster_table: name of raster table to query. (string)
+            jsonp:        return result as jsonp function call (string)
+
+    """
     return buffer_value_at_point(rad=25, legacy=True)
 
 
 @app.route('/polygon')
 def value_at_polygon():
+    """Get average value for an area of a scored raster defined by a polygon.
+
+       Expects:
+            id:           longitude of point (float)
+            geom:         WKT format of POLYGON((..))
+            raster_table: name of raster table to query. (string)
+            jsonp:        return result as jsonp function call (string)
+    """
+
     point_id = request.args.get('id') or 999
     raster_table = request.args.get('raster_table')
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
@@ -80,13 +107,14 @@ def value_at_polygon():
     geom = request.args.get('geom')
 
     if not geom:
-        return jsonify({}, jsonp=jsonp)
+        abort(400)
 
     # Check polygon syntax
     rx = re.compile(
         "POLYGON\(\((?P<point>(-?\d+(?:\.\d+)? -?\d+(?:\.\d+)?)(?:, ?)?)+\)\)"
     )
-    if not rx.match(geom):
+
+    if not rx.match(geom) or not raster_table:
         abort(400)
 
     start = datetime.now()
@@ -108,7 +136,7 @@ def value_at_polygon():
         }
         if explanation:
             result['explanation'] = explanation
-    except Exception:
+    except Exception, ex:
         return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
@@ -116,7 +144,14 @@ def value_at_polygon():
 
 @app.route('/point')
 def value_at_point():
-    """Get the value at a lon, lat for a given view."""
+    """Get the value at a lon, lat for a given view.
+
+       Expects:
+            lon:          longitude of point (float)
+            lat:          latitude of point (float)
+            tifs:         multiple raster tifs to get scores from
+            jsonp:        return result as jsonp function call (string)
+    """
     lon = request.args.get('lon')
     lat = request.args.get('lat')
     tifs = tuple(request.args.getlist('tif[]'))
@@ -146,7 +181,15 @@ def value_at_point():
 
 @app.route('/point_in_polygon')
 def value_point_in_pol():
-    """Get the value for a polygon field at a lon, lat."""
+    """Get the value for a polygon field at a lon, lat.
+
+       Expects:
+            lon:          longitude of point (float)
+            lat:          latitude of point (float)
+            table:        table to query (string)
+            field:        field to retrieve (string)
+            jsonp:        return result as jsonp function call (string)
+    """
     lon = request.args.get('lon')
     lat = request.args.get('lat')
     table = request.args.get('table')
@@ -175,9 +218,17 @@ def value_point_in_pol():
 
 @app.errorhandler(400)
 def bad_request(error):
-    import pudb; pudb.set_trace()
-    expected = ""
-    resp = make_response('Bad arguments provided. Expected: %s', 400)
+    docstr = globals().get(request.endpoint).__doc__
+    if 'Expects' not in docstr:
+        docstr = ""
+    else:
+        docstr = docstr[docstr.find('Expects'):]
+
+    path = request.path
+    resp = make_response('Bad arguments provided to %s. %s' % (
+        path,
+        docstr,
+    ), 400)
     resp.headers['Content-Type'] = 'text/plain'
     return resp
 
