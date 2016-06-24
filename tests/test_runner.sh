@@ -1,3 +1,3 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source $DIR/test_setup.sh
+export PYTHONPATH=/home/jpeel/slots/maplecroft/versions/current:$DIR/..
 python $DIR/test.py

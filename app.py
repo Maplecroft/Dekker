@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 # -*- coding: iso-8859-15 -*-
 import re
 from datetime import datetime
@@ -31,7 +32,6 @@ def buffer_value_at_point(rad=None, legacy=False):
 
     """
     point_id = request.args.get('id') or 999
-
     try:
         rad = rad or request.args.get('radius')
     except:
@@ -42,7 +42,6 @@ def buffer_value_at_point(rad=None, legacy=False):
     raster_table = request.args.get('raster_table')
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
     explain = request.args.get('explain', False) == 'true'
-    fixed = request.args.get('explain', False) == 'true'
 
     if not lon or not lat or not len(raster_table):
         abort(400)
@@ -50,17 +49,18 @@ def buffer_value_at_point(rad=None, legacy=False):
     start = datetime.now()
     result = {}
     try:
-        row, explanation = get_buffer_values_at_points(
+        results, explanation = get_buffer_values_at_points(
             float(rad),
             [(lon, lat, int(point_id))],
             raster_table,
             explain=explain,
             legacy=legacy,
         )
+
         result = {
             'query': {
-                'value': row[0][1],
-                'id': row[0][0],
+                'value': results[0][1],
+                'id': results[0][0],
                 'raster': raster_table,
             },
             'time': (datetime.now() - start).total_seconds(),
@@ -68,7 +68,6 @@ def buffer_value_at_point(rad=None, legacy=False):
         if explanation:
             result['explanation'] = explanation
     except Exception, ex:
-        print ex
         return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)

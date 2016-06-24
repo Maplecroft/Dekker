@@ -80,17 +80,44 @@ INSERT INTO buffers_for_raster(id, geom)
 """
 
 # Step 3 of buffer/polygon point scoring.  Actually calculate
-# the score using st_clip and st_summarystats
+# the score using st_clip and st_summarystats.  Please note,
+# when rasters are inserted they are broken into pixel chunks/segments
+# of the size specified to the raster2pgsql command. i.e.
+# this query will operate on lots of mini-rasters not one big
+# raster image.
+#
+# Breakdown of this query:
+# 1. create stats_table - this is the st_stats and point id for
+#    the buffer area(s) to be scored.  There will be one row
+#    in this table for each raster segment (i.e. more than one where
+#    our area crosses boundaries between segments)
+#
+#    1.1  Find the bits of raster that intersects our geometry
+#    1.2  ST_Clip the bit of raster to the geometry
+#    1.3  Get stats from this clipped bit
+#
+# 2. Calculated a weighted average of valid scores across segments
+#    using the weight defined by the number of pixels within each segment
+#
+# 3. Done.
+#
 BUFFER_QUERY_SQL = """
-SELECT b.id, (
-      CAST((ST_SummaryStats(
-        ST_Clip("<<TABLE_NAME>>".rast, 1, b.geom, true)
-      )
-    ).mean AS decimal(9, 3))) AS avgimr
-  FROM "<<TABLE_NAME>>", buffers_for_raster b
- WHERE b.id IN (%s)
-   AND ST_Intersects(b.geom, "<<TABLE_NAME>>".rast)
- ORDER BY id;
+SELECT id, CAST(
+        (
+            SUM((stats).mean * (stats).count) / SUM((stats).count)
+        ) AS decimal(9, 3)) as avgimr FROM (
+        SELECT b.id as id,
+               (
+                    ST_SummaryStats(
+                        ST_Clip("<<TABLE_NAME>>".rast, 1, b.geom, true)
+                    )
+               ) AS stats
+         FROM "<<TABLE_NAME>>", buffers_for_raster b
+        WHERE b.id IN (%s)
+          AND ST_Intersects(b.geom, "<<TABLE_NAME>>".rast)
+        ORDER BY b.id
+) AS stats_table
+GROUP BY id;
 """
 
 # Cleanup query - deletes the buffers from dekker that
@@ -220,7 +247,6 @@ def set_buffer_at_point(conn, cur, point, buf=25, legacy=False):
 
         # Set our geometry to a be a single point
         query_string = SET_BUFFER_AT_POINT_SQL % "POINT(%s %s)"
-
     # Create the buffer
     cur.execute(query_string, (id, lng, lat, buf, id))
 
@@ -288,7 +314,7 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
     # Add explanation?
     explanation = []
     if explain:
-        explanation = cur.mogrify(sql, (id,))
+        explanation = cur.mogrify(sql)
 
     # Return results
     result = cur.fetchall()
