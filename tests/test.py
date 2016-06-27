@@ -1,6 +1,6 @@
 import os
 import json
-import app
+from app import app
 import unittest
 import tempfile
 import tablib
@@ -8,9 +8,9 @@ import tablib
 class DekkerTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.db_fd, app.app.config['DATABASE'] = tempfile.mkstemp()
-        app.app.config['TESTING'] = True
-        self.app = app.app.test_client()
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.app = app.test_client()
 
         self.point = (-4.483545, 54.140744)
         self.raster = "test_raster"
@@ -24,7 +24,7 @@ class DekkerTestCase(unittest.TestCase):
 
     def tearDown(self):
         os.close(self.db_fd)
-        os.unlink(app.app.config['DATABASE'])
+        os.unlink(app.config['DATABASE'])
 
 
     def notest_value_at_point(self):

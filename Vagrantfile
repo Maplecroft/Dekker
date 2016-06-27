@@ -13,7 +13,13 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/srv/www/dekker"
 
   # Port forwarding for dekker service
-  config.vm.network :forwarded_port, guest: 80, host: 8080
+  config.vm.network :forwarded_port, guest: 80, host: 8085
+
+
+  config.vm.provision "fix-no-tty", type: "shell" do |s|
+      s.privileged = false
+      s.inline = "sudo sed -i '/tty/!s/mesg n/tty -s \\&\\& mesg n/' /root/.profile"
+  end
 
   # Set up masterless salt on the box with the salt provisioner
   config.vm.provision :salt do |salt|

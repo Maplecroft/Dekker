@@ -9,7 +9,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 psql -f $DIR/data/dekker_schema.sql testrasters;
 
 # Copy test settings
-cp $DIR/test-conf.py $DIR/../conf.py
+cp $DIR/test-conf.py $DIR/../app/conf.py
 
 # Load test raster
 raster2pgsql -d -s 4326 -C -I -M $DIR/data/test_raster.tif -F -t 128x128 -N -340282000000000000000000000000000000000 public.test_raster | psql -d testrasters;
