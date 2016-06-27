@@ -39,7 +39,7 @@ def buffer_value_at_point(rad=None, legacy=False):
 
     lon = request.args.get('lon')
     lat = request.args.get('lat')
-    raster_table = request.args.get('raster_table')
+    raster_table = request.args.get('raster_table').lower()
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
     explain = request.args.get('explain', False) == 'true'
 
@@ -100,7 +100,7 @@ def value_at_polygon():
     """
 
     point_id = request.args.get('id') or 999
-    raster_table = request.args.get('raster_table')
+    raster_table = request.args.get('raster_table').lower()
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
     explain = request.args.get('explain', False) == 'true'
     geom = request.args.get('geom')
