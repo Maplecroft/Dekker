@@ -230,10 +230,13 @@ def set_buffer_at_point(conn, cur, point, buf=25, legacy=False):
     # gets an identical result to that retrieved when using the below 'else'
     # block below. If this is true for all rasters, the legacy block can be
     # killed off.
+    # i.e. if using legacy st_intersection calculation method, these blocks
+    # seem equitiable
 
     # The same is NOT true for the reverse.  If using the Correct(TM) way of
     # calculating buffer scores with ST_Clip, the old Good Enough(TM) conversion
     # seems to skew the result, at least on our test raster
+    # i.e. if using newer st_clip calculation method, these blocks are not equal
     if legacy:
         # Convert from kms to metres. Not perfect, but Good Enough(TM).
         buf = buf / 111.13
