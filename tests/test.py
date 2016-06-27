@@ -192,7 +192,6 @@ class DekkerTestCase(unittest.TestCase):
 
         # Check legacy expectations
         for idx, point in enumerate(points):
-            break
             for ridx, (slug, raster) in enumerate(rasters):
                 key = "%.2f%.2f%s" % (point[0], point[1], raster)
 
@@ -213,7 +212,7 @@ class DekkerTestCase(unittest.TestCase):
 
                 try:
                     value = json.loads(response.data)['query']['value']
-                except:
+                except Exception, ex:
                     print "error: %s: %s" % (point, raster)
                     self.fail()
 
@@ -289,6 +288,7 @@ class DekkerTestCase(unittest.TestCase):
                         diff = abs(
                             float(value) - float(expectations[key])
                         )
+                        print diff, point, raster, value, expectations[key]
                         self.assertEqual(
                             diff < 0.22,
                             True
