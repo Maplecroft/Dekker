@@ -4,6 +4,20 @@ Dekker: simple HTTP API on PostGIS
 Dekker is very simple a Flask-based HTTP API for getting point-value and
 point-buffer data from raster files stored in a PostGIS 2 database.
 
+Test setup
+==========
+Some system level dependencies must be met in order to run this application.
+For Ubuntu systems, please follow the steps outlined here:
+
+http://suite.opengeo.org/ee/docs/4.5/intro/installation/ubuntu/install.html
+
+Nothing fancy here (yet). Once installed per the link above, just run 
+'tests/test_runner.sh' script for basic test run through with a single raster.
+
+Alternatively, run tests/test_setup.sh once and manually run all tests by executing::
+
+    python tests/test.py
+
 
 Deployment with Runit and Nginx
 ===============================
@@ -77,7 +91,7 @@ Assuming it is deployed at dekker.example.com, you can then request, eg::
 For points, and::
 
     $ curl  -H "Content-type: application/json" \
-    > "http://dekker.example.com/buffer?radius=10&lon=51&lat=-2&tif%5b%5d=source_file_1.tif&tif%5b%5d=source_file_2.tif"
+    > "http://dekker.example.com/pointbuffer?radius=10&lon=51&lat=-2&tif%5b%5d=source_file_1.tif&tif%5b%5d=source_file_2.tif"
     {
       "count": 2,
       "list": [
