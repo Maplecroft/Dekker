@@ -37,7 +37,7 @@ SELECT
     %s AS lon,
     %s AS lat,
     rast.filename,
-    ST_Value(rast.rast, ST_SetSRID(ST_Make#Point(%s, %s), 4326))
+    ST_Value(rast.rast, ST_SetSRID(ST_MakePoint(%s, %s), 4326))
 FROM "<<TABLE_NAME>>" AS rast
 WHERE ST_Intersects(ST_SetSRID(ST_MakePoint(%s, %s), 4326), rast.rast)
 AND rast.filename IN %s;
