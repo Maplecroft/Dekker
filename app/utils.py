@@ -1,8 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 
-import conf
+import os
 import psycopg2
+import rasterio
+
+import conf
+from shapely import wkt
+from shapely.geometry import Point
+from winston.stats import summary
+
 
 def get_conn_cur():
     """DB setup shortcut."""
@@ -14,6 +21,21 @@ def get_conn_cur():
     )
     cur = conn.cursor()
     return conn, cur
+
+
+def table_exists(table):
+    connection, cur = get_conn_cur()
+    result = False
+    try:
+        cur.execute("""
+            select exists(
+                select * from information_schema.tables where table_name=%s
+            )""", (table,)
+        )
+        result = cur.fetchone()[0]
+    finally:
+        connection.close()
+    return result
 
 
 def with_connection(fn):
@@ -275,19 +297,32 @@ def set_buffer_at_polygon(conn, cur, point_id, polygon):
 @with_connection
 def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
                                 explain=False):
+    if table_exists(raster):
+        # Create our buffer
+        set_buffer_at_polygon(point_id, polygon)
 
-    # Create our buffer
-    set_buffer_at_polygon(point_id, polygon)
+        # Run the query
+        sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+        explanation = False
+        cur.execute(sql, (point_id,))
 
-    # Run the query
-    sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
-    explanation = False
-    cur.execute(sql, (point_id,))
+        if explain:
+            explanation = cur.mogrify(sql, (point_id,))
 
-    if explain:
-        explanation = cur.mogrify(sql, (point_id,))
-
-    return cur.fetchall(), explanation
+        return cur.fetchall(), explanation
+    else:
+        geom = wkt.loads(polygon)
+        fname = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)),
+            '..',
+            'data',
+            '{}.tif'.format(raster.rstrip('_raster')),
+        )
+        with rasterio.open(fname) as src:
+            result = summary(src, geom, bounds=(0, 10))
+            return [
+                (point_id, result.mean),
+            ], str(result) if explain else None
 
 
 @with_connection
@@ -295,30 +330,46 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
                                 legacy=False):
     """Get a buffer of approx bufKM around point (lon, lat) in raster."""
 
-    # Create buffers
-    for point in points:
-        set_buffer_at_point(point, buf, legacy=legacy)
+    if table_exists(raster):
+        # Create buffers
+        for point in points:
+            set_buffer_at_point(point, buf, legacy=legacy)
 
-    # Create query
-    sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
-    ids = [str(pt[2]) for pt in points]
+        # Create query
+        sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+        ids = [str(pt[2]) for pt in points]
 
-    # Support legacy ST_intersection scoring
-    if legacy:
-        sql = LEGACY_BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
-        explanation = False
-        id = point[2]
-        cur.execute(sql, (id,))
+        # Support legacy ST_intersection scoring
+        if legacy:
+            sql = LEGACY_BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+            explanation = False
+            id = point[2]
+            cur.execute(sql, (id,))
+        else:
+            # Otherwise revert to the proper way of doing it
+            sql = sql % ", ".join(ids)
+            cur.execute(sql)
+
+        # Add explanation?
+        explanation = []
+        if explain:
+            explanation = cur.mogrify(sql)
+
+        # Return results
+        result = cur.fetchall()
+        return result, explanation
     else:
-        # Otherwise revert to the proper way of doing it
-        sql = sql % ", ".join(ids)
-        cur.execute(sql)
-
-    # Add explanation?
-    explanation = []
-    if explain:
-        explanation = cur.mogrify(sql)
-
-    # Return results
-    result = cur.fetchall()
-    return result, explanation
+        fname = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)),
+            '..',
+            'data',
+            '{}.tif'.format(raster.rstrip('_raster')),
+        )
+        with rasterio.open(fname) as src:
+            results = []
+            for lon, lat, point_id in points:
+                result = summary(
+                    src, Point(lat, lon).buffer(buf / 111.13), bounds=(0, 10),
+                )
+                results.append([(point_id, result.mean)])
+            return results, None
