@@ -11,6 +11,15 @@ from shapely.geometry import Point
 from winston.stats import summary
 
 
+def get_raster_file_path(raster):
+    return os.path.join(
+        os.path.abspath(os.path.dirname(__file__)),
+        '..',
+        'data',
+        '{}.tif'.format(raster.rstrip('_raster')),
+    )
+
+
 def get_conn_cur():
     """DB setup shortcut."""
     conn = psycopg2.connect(
@@ -312,13 +321,7 @@ def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
         return cur.fetchall(), explanation
     else:
         geom = wkt.loads(polygon)
-        fname = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)),
-            '..',
-            'data',
-            '{}.tif'.format(raster.rstrip('_raster')),
-        )
-        with rasterio.open(fname) as src:
+        with rasterio.open(get_raster_file_path(raster)) as src:
             result = summary(src, geom, bounds=(0, 10))
             return [
                 (point_id, result.mean),
@@ -359,13 +362,7 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
         result = cur.fetchall()
         return result, explanation
     else:
-        fname = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)),
-            '..',
-            'data',
-            '{}.tif'.format(raster.rstrip('_raster')),
-        )
-        with rasterio.open(fname) as src:
+        with rasterio.open(get_raster_file_path(raster)) as src:
             results = []
             for lon, lat, point_id in points:
                 result = summary(
