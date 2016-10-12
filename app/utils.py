@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-15 -*-
 
+import conf
 import os
 import psycopg2
 import rasterio
 
-import conf
 from shapely import wkt
 from shapely.geometry import Point
 from winston.stats import summary
