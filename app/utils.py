@@ -324,7 +324,7 @@ def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
         with rasterio.open(get_raster_file_path(raster)) as src:
             result = summary(src, geom, bounds=(0, 10))
             return [
-                (point_id, result.mean),
+                (point_id, float(result.mean)),
             ], str(result) if explain else None
 
 
@@ -368,5 +368,5 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
                 result = summary(
                     src, Point(lat, lon).buffer(buf / 111.13), bounds=(0, 10),
                 )
-                results.append([(point_id, result.mean)])
+                results.append((point_id, float(result.mean)))
             return results, None

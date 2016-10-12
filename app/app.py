@@ -37,19 +37,19 @@ def buffer_value_at_point(rad=None, legacy=False):
             id:           a given point id (int) - defaults to 999
             lon:          longitude of point (float)
             lat:          latitude of point (float)
-            rad:          radius of buffer in km (int/float)
+            radius:       radius of buffer in km (int/float)
             raster_table: name of raster table to query. (string)
             jsonp:        return result as jsonp function call (string)
 
     """
     point_id = request.args.get('id') or 999
     try:
-        rad = rad or request.args.get('radius')
+        rad = rad or float(request.args.get('radius'))
     except:
         abort(400)
 
-    lon = request.args.get('lon')
-    lat = request.args.get('lat')
+    lon = float(request.args.get('lon'))
+    lat = float(request.args.get('lat'))
     raster_table = request.args.get('raster_table').lower()
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
     explain = request.args.get('explain', False) == 'true'
@@ -61,7 +61,7 @@ def buffer_value_at_point(rad=None, legacy=False):
     result = {}
     try:
         results, explanation = get_buffer_values_at_points(
-            float(rad),
+            rad,
             [(lon, lat, int(point_id))],
             raster_table,
             explain=explain,
