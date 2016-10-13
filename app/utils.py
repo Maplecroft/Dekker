@@ -2,7 +2,31 @@
 # -*- coding: iso-8859-15 -*-
 
 import conf
+import os
 import psycopg2
+import rasterio
+
+from functools import partial
+from shapely import wkt
+from shapely.geometry import Point
+from winston.stats import summary
+
+# Ensure consistent usage of the Winston summary stats: counting only pixels
+# with a value between zero and ten, and only those that are *mostly* inside
+# our geometry, not all those that are touched by it.
+summary_stats = partial(summary, bounds=(0, 10), all_touched=False)
+
+
+def get_raster_file_path(raster):
+    # We look for rasters in '../data' minus the '_raster' suffix and with a
+    # '.tif' extension.
+    return os.path.join(
+        os.path.abspath(os.path.dirname(__file__)),
+        '..',
+        'data',
+        '{}.tif'.format(raster.rstrip('_raster')),
+    )
+
 
 def get_conn_cur():
     """DB setup shortcut."""
@@ -14,6 +38,21 @@ def get_conn_cur():
     )
     cur = conn.cursor()
     return conn, cur
+
+
+def table_exists(table):
+    connection, cur = get_conn_cur()
+    result = False
+    try:
+        cur.execute("""
+            select exists(
+                select * from information_schema.tables where table_name=%s
+            )""", (table,)
+        )
+        result = cur.fetchone()[0]
+    finally:
+        connection.close()
+    return result
 
 
 def with_connection(fn):
@@ -275,19 +314,30 @@ def set_buffer_at_polygon(conn, cur, point_id, polygon):
 @with_connection
 def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
                                 explain=False):
+    # If the table is in the database, carry on & use ST_SummaryStats to get
+    # the score.
+    if table_exists(raster):
+        # Create our buffer
+        set_buffer_at_polygon(point_id, polygon)
 
-    # Create our buffer
-    set_buffer_at_polygon(point_id, polygon)
+        # Run the query
+        sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+        explanation = False
+        cur.execute(sql, (point_id,))
 
-    # Run the query
-    sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
-    explanation = False
-    cur.execute(sql, (point_id,))
+        if explain:
+            explanation = cur.mogrify(sql, (point_id,))
 
-    if explain:
-        explanation = cur.mogrify(sql, (point_id,))
-
-    return cur.fetchall(), explanation
+        return cur.fetchall(), explanation
+    else:
+        # If the table isn't in the database, we check for a geotiff file on
+        # disk with a matching name that we can read stats from using Winston.
+        geom = wkt.loads(polygon)
+        with rasterio.open(get_raster_file_path(raster)) as src:
+            result = summary_stats(src, geom)
+            return [
+                (point_id, float(result.mean)),
+            ], str(result) if explain else None
 
 
 @with_connection
@@ -295,30 +345,43 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
                                 legacy=False):
     """Get a buffer of approx bufKM around point (lon, lat) in raster."""
 
-    # Create buffers
-    for point in points:
-        set_buffer_at_point(point, buf, legacy=legacy)
+    # If the table is in the database, carry on & use ST_SummaryStats to get
+    # the score.
+    if table_exists(raster):
+        # Create buffers
+        for point in points:
+            set_buffer_at_point(point, buf, legacy=legacy)
 
-    # Create query
-    sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
-    ids = [str(pt[2]) for pt in points]
+        # Create query
+        sql = BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+        ids = [str(pt[2]) for pt in points]
 
-    # Support legacy ST_intersection scoring
-    if legacy:
-        sql = LEGACY_BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
-        explanation = False
-        id = point[2]
-        cur.execute(sql, (id,))
+        # Support legacy ST_intersection scoring
+        if legacy:
+            sql = LEGACY_BUFFER_QUERY_SQL.replace("<<TABLE_NAME>>", raster)
+            explanation = False
+            id = point[2]
+            cur.execute(sql, (id,))
+        else:
+            # Otherwise revert to the proper way of doing it
+            sql = sql % ", ".join(ids)
+            cur.execute(sql)
+
+        # Add explanation?
+        explanation = []
+        if explain:
+            explanation = cur.mogrify(sql)
+
+        # Return results
+        result = cur.fetchall()
+        return result, explanation
     else:
-        # Otherwise revert to the proper way of doing it
-        sql = sql % ", ".join(ids)
-        cur.execute(sql)
-
-    # Add explanation?
-    explanation = []
-    if explain:
-        explanation = cur.mogrify(sql)
-
-    # Return results
-    result = cur.fetchall()
-    return result, explanation
+        # If the table isn't in the database, we check for a geotiff file on
+        # disk with a matching name that we can read stats from using Winston.
+        with rasterio.open(get_raster_file_path(raster)) as src:
+            results = []
+            for lon, lat, point_id in points:
+                geom = Point(lat, lon).buffer(buf / 111.13)
+                result = summary_stats(src, geom)
+                results.append((point_id, float(result.mean)))
+            return results, None
