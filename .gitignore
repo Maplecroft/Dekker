@@ -4,3 +4,4 @@ dbdump/
 conf.py
 *.swp
 *.swo
+data/
