@@ -381,7 +381,7 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
         with rasterio.open(get_raster_file_path(raster)) as src:
             results = []
             for lon, lat, point_id in points:
-                geom = Point(lat, lon).buffer(buf / 111.13)
+                geom = Point(lon, lat).buffer(buf / 111.13)
                 result = summary_stats(src, geom)
                 results.append((point_id, float(result.mean)))
             return results, None
