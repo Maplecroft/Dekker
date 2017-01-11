@@ -19,13 +19,31 @@ summary_stats = partial(summary, bounds=(0, 10), all_touched=False)
 
 def get_raster_file_path(raster):
     # We look for rasters in '../data' minus the '_raster' suffix and with a
-    # '.tif' extension.
-    return os.path.join(
+    # '.tif' extension. We also do a case-insensitive lookup for files on disk
+    # (the raster parameter is lowercased from the original request because
+    # when we only looked things up in Postgres all table names were lower case
+    # so it made sense).
+    if raster.endswith('_raster'):
+        raster = raster[:-7]
+
+    data_dir = os.path.join(
         os.path.abspath(os.path.dirname(__file__)),
         '..',
         'data',
-        '{}.tif'.format(raster.rstrip('_raster')),
     )
+
+    fname = '{}.tif'.format(raster)
+    tifs = os.listdir(data_dir)
+
+    if fname not in tifs:
+        for tif in tifs:
+            if fname == tif.lower():
+                fname = tif
+                break
+        else:
+            raise IOError("Can't find {}".format(raster))
+
+    return os.path.join(data_dir, fname)
 
 
 def get_conn_cur():
