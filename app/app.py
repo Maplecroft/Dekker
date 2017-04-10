@@ -2,8 +2,11 @@
 
 # -*- coding: iso-8859-15 -*-
 import re
+import os
+
 from datetime import datetime
 import logging
+from logging.handlers import RotatingFileHandler
 
 from flask import Flask, abort, make_response, request, jsonify
 from flask import __version__ as flask_version
@@ -18,6 +21,7 @@ from utils import (
 
 app = Flask(__name__)
 
+LOG_LOCATION = "/var/log/dekker"
 
 @app.before_first_request
 def setup_logging():
@@ -25,6 +29,12 @@ def setup_logging():
         # In production mode, add log handler to sys.stderr
         # app is internal so we want debug level logging
         app.logger.addHandler(logging.StreamHandler())
+        if os.path.isdir(LOG_LOCATION):
+            app.logger.addHandler(
+                RotatingFileHandler(
+                    os.path.join(LOG_LOCATION, 'dekker.log')
+                )
+            )
         app.logger.setLevel(logging.DEBUG)
 
 
