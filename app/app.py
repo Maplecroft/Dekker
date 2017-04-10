@@ -21,7 +21,6 @@ from utils import (
 
 app = Flask(__name__)
 
-LOG_LOCATION = "/var/log/dekker"
 
 @app.before_first_request
 def setup_logging():
@@ -29,10 +28,10 @@ def setup_logging():
         # In production mode, add log handler to sys.stderr
         # app is internal so we want debug level logging
         app.logger.addHandler(logging.StreamHandler())
-        if os.path.isdir(LOG_LOCATION):
+        if os.path.isdir(conf.LOG_LOCATION):
             app.logger.addHandler(
                 RotatingFileHandler(
-                    os.path.join(LOG_LOCATION, 'dekker.log')
+                    os.path.join(conf.LOG_LOCATION, 'dekker.log')
                 )
             )
         app.logger.setLevel(logging.DEBUG)
