@@ -79,6 +79,7 @@ def buffer_value_at_point(rad=None, legacy=False):
         if explanation:
             result['explanation'] = explanation
     except Exception, ex:
+        app.logger.warning(ex)
         return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
@@ -147,6 +148,7 @@ def value_at_polygon():
         if explanation:
             result['explanation'] = explanation
     except Exception, ex:
+        app.logger.warning(ex)
         return abort(400)
 
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
