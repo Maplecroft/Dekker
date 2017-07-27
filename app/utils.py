@@ -16,6 +16,9 @@ from winston.stats import summary
 # our geometry, not all those that are touched by it.
 summary_stats = partial(summary, bounds=(0, 10), all_touched=False)
 
+# But for tiny areas, provide a means of hitting 'touched' pixels
+summary_stats_touched = partial(summary, bounds=(0, 10), all_touched=True)
+
 
 def get_raster_file_path(raster):
     # We look for rasters in '../data' minus the '_raster' suffix and with a
@@ -353,6 +356,16 @@ def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
         geom = wkt.loads(polygon)
         with rasterio.open(get_raster_file_path(raster)) as src:
             result = summary_stats(src, geom)
+
+            # Fall back on touched pixels for small areas
+            # XXX jpeel 2017-07-27: Not ideal - thin long shapes
+            # could exceed have an area > 2 pixels yet still not
+            # have an 'mostly within' pixels
+            if result is None:
+                print src.res[0]
+                twice_pixel_area = ((src.res[0] * src.res[1]) * 2)
+                if geom.area < twice_pixel_area:
+                    result = summary_stats_touched(src, geom)
             return [
                 (point_id, float(result.mean)),
             ], str(result) if explain else None
@@ -401,5 +414,13 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
             for lon, lat, point_id in points:
                 geom = Point(lon, lat).buffer(buf / 111.13)
                 result = summary_stats(src, geom)
+
+                # If we have a tiny area, include touched pixels on return of
+                # no result from any one pixel.
+                if result is None:
+                    twice_pixel_size = ((src.res[0] * 111.13) * 2)
+                    if buf < twice_pixel_size:
+                        result = summary_stats_touched(src, geom)
+
                 results.append((point_id, float(result.mean)))
             return results, None
