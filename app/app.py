@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # -*- coding: iso-8859-15 -*-
+import os
 import re
 
 from datetime import datetime
@@ -11,10 +12,14 @@ from flask import __version__ as flask_version
 
 import conf
 from utils import (
-    get_value_at_points,
-    get_point_in_polygon_value,
     get_buffer_value_at_polygon,
     get_buffer_values_at_points,
+    get_point_in_polygon_value,
+    get_raster_file_path,
+    get_value_at_points,
+    is_valid,
+    make_live,
+    md5sum
 )
 
 app = Flask(__name__)
@@ -226,6 +231,75 @@ def value_point_in_pol():
     }
     if explanation:
         result['explanation'] = explanation
+    return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+
+@app.route('/publish', methods=['POST'])
+def publish():
+    """ Uploads a file to a draft area then moves it to data directory if valid.
+        Expects:
+            index_slug:   unique name of tif file to lookup(string)
+            file:        in request.files for upload
+            jsonp:        return result as jsonp function call (string)
+    """
+    index_slug = request.form.get('index_slug')
+    jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
+
+    if not index_slug or 'file' not in request.files:
+        abort(400)
+
+    if index_slug.endswith('_raster'):
+        index_slug = index_slug[:-7]
+
+    result = {
+        'errors': []
+    }
+
+    draft_file = os.path.join(conf.DRAFT_DIR,
+                              '{}.tif'.format(index_slug))
+
+    request.files['file'].save(draft_file)
+
+    try:
+        if is_valid(index_slug, base_path=conf.DRAFT_DIR):
+            live_file = make_live(draft_file)
+            if os.path.exists(live_file):
+                result = {
+                    'md5': md5sum(live_file)
+                }
+
+    except Exception as e:
+        result['errors'].append(e.message)
+
+    return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+
+@app.route('/md5')
+def get_md5_for_index_view_slug():
+    """ Gets the md5 value for a tif matching the slug parameter or -1 if
+    not found.
+
+        Expects:
+            index_slug:   unique name of tif file to lookup(string)
+            jsonp:        return result as jsonp function call (string)
+    """
+    index_slug = request.args.get('index_slug')
+    jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
+
+    if not index_slug:
+        abort(400)
+
+    value = -1
+    try:
+        raster_file = get_raster_file_path(index_slug)
+        value = md5sum(raster_file)
+
+    except IOError:
+        pass
+
+    result = {
+        'md5': value
+    }
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
 
 

@@ -4,6 +4,18 @@ from app import app
 import unittest
 import tempfile
 import tablib
+import conf
+
+# Index slugs and their md5s used in tests.
+MD5_TEST_CONFIG = [
+    ('nh_drought_hazard_2017-Q2', 'aa376cfc112c6253084e927ae52577de'),
+
+    ('nh_tropical_storm_and_cyclone_hazard_2017-Q2',
+     '8a2438f643d7127611767e94d5edc98f'),
+
+    ('pr_civil_unrest_2018-Q1_v1', '2fc359bb85c1ee5b1f963f50a0cd583a'),
+]
+
 
 class DekkerTestCase(unittest.TestCase):
 
@@ -11,6 +23,16 @@ class DekkerTestCase(unittest.TestCase):
         self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
         app.config['TESTING'] = True
         self.app = app.test_client()
+
+        conf.DRAFT_DIR = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)),
+            'draft',
+        )
+
+        conf.DATA_DIR = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)),
+            'data',
+        )
 
         self.point = (-4.483545, 54.140744)
         self.raster = "test_raster"
@@ -26,13 +48,61 @@ class DekkerTestCase(unittest.TestCase):
         os.close(self.db_fd)
         os.unlink(app.config['DATABASE'])
 
+    def test_publish(self):
+        """
+        Tests posting a file to the /publish method, which validates the tif
+        and then moves it to the data dir. Responds with md5 hash of published
+        file.
+
+        :return:
+        """
+        client = app.test_client()
+
+        for index_slug, md5 in MD5_TEST_CONFIG:
+            resp = client.post(
+                '/publish',
+                buffered=True,
+                content_type='multipart/form-data',
+                data={
+                    'file': (
+                        open(
+                            os.path.join(
+                                os.path.split(__file__)[0],
+                                'data/{}.tif'.format(index_slug)
+                            )
+                        ),
+                        '{}.tif'.format(index_slug)
+                    ),
+                    'index_slug': 'index_slug'
+                }
+            )
+
+            self.assertEqual(
+                md5,
+                json.loads(
+                    resp.data
+                )['md5'],
+            )
+
+    def test_md5(self):
+        client = app.test_client()
+
+        for index_slug, md5 in MD5_TEST_CONFIG:
+            resp = client.get(
+                '/md5?index_slug={}'.format(index_slug),
+            )
+            self.assertEqual(
+                md5,
+                json.loads(
+                    resp.data
+                )['md5'],
+            )
 
     def notest_value_at_point(self):
         # Bad request and docstring check
         response = self.app.get('/point')
         self.assertEqual(response.status_code, 400)
         self.assertEqual('Expects:' in response.data, True)
-
 
     def notest_legacy_buffer_value_at_point(self):
 
@@ -156,7 +226,7 @@ class DekkerTestCase(unittest.TestCase):
             2.490
         )
 
-    def test_expectations(self):
+    def notest_expectations(self):
         """Buffer score tests with set expectations."""
         points = [
             (-4.48354500, 54.14074400), # Isle of man
@@ -173,7 +243,7 @@ class DekkerTestCase(unittest.TestCase):
             ("cse16", "nh_extra_tropical_cyclone_hazard_2016_raster",),
             ("fld16", "nh_flood_hazard_2016_raster",),
             ("lse16", "nh_landslide_earthquake_related_hazard_2016_raster",),
-            ("ppx16", "nh_natural_hazards_population_exposure_abs_2016_raster",),
+            ("ppx16", "nh_natural_hazards_populatione_xposure_abs_2016_raster",),
             ("ssm16", "nh_seismic_hazard_2016_raster",),
             ("wfr16", "nh_wildfire_hazard_2016_raster",),
             ("ghg16", "cc_total_ghg_emissions_2016_raster",),
