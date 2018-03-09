@@ -243,7 +243,7 @@ class DekkerTestCase(unittest.TestCase):
             ("cse16", "nh_extra_tropical_cyclone_hazard_2016_raster",),
             ("fld16", "nh_flood_hazard_2016_raster",),
             ("lse16", "nh_landslide_earthquake_related_hazard_2016_raster",),
-            ("ppx16", "nh_natural_hazards_populatione_xposure_abs_2016_raster",),
+            ("ppx16", "nh_natural_hazards_population_exposure_abs_2016_raster",),
             ("ssm16", "nh_seismic_hazard_2016_raster",),
             ("wfr16", "nh_wildfire_hazard_2016_raster",),
             ("ghg16", "cc_total_ghg_emissions_2016_raster",),
