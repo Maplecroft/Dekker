@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # -*- coding: iso-8859-15 -*-
+import os
 import re
 
 from datetime import datetime
@@ -11,10 +12,14 @@ from flask import __version__ as flask_version
 
 import conf
 from utils import (
-    get_value_at_points,
-    get_point_in_polygon_value,
     get_buffer_value_at_polygon,
     get_buffer_values_at_points,
+    get_point_in_polygon_value,
+    get_raster_file_path,
+    get_value_at_points,
+    is_valid,
+    make_live,
+    md5sum
 )
 
 app = Flask(__name__)
@@ -113,7 +118,7 @@ def value_at_polygon():
     """
 
     point_id = request.args.get('id') or 999
-    raster_table = request.args.get('raster_table').lower()
+    raster_table = (request.args.get('raster_table') or "").lower()
     jsonp = request.args.get('jsonp', False) and float(flask_version) >= 0.9
     explain = request.args.get('explain', False) == 'true'
     geom = request.args.get('geom')
@@ -227,6 +232,112 @@ def value_point_in_pol():
     if explanation:
         result['explanation'] = explanation
     return jsonify(result) if not jsonp else jsonify(result, jsonp=jsonp)
+
+
+
+
+def _validate(index_view_slug):
+
+    return is_valid(
+        index_view_slug, base_path=conf.DRAFT_DIR
+    )
+
+
+@app.route('/validate', methods=['POST'])
+def validate():
+    """ Uploads a file to a draft area then tests if it is valid.
+        Expects:
+            index_view_slug:   unique name of tif file to lookup(string)
+            file:              in request.files for upload
+    """
+    index_view_slug = request.form.get('index_view_slug')
+
+    if not index_view_slug or 'file' not in request.files:
+        abort(400)
+
+    if index_view_slug.endswith('_raster'):
+        index_view_slug = index_view_slug[:-7]
+
+    draft_file = os.path.join(conf.DRAFT_DIR,
+                              '{}.tif'.format(index_view_slug))
+    request.files['file'].save(draft_file)
+    result = {'errors': []}
+    try:
+        valid = is_valid(
+            index_view_slug, base_path=conf.DRAFT_DIR
+        )
+        result = {
+            'md5': md5sum(draft_file),
+            'valid': valid
+        }
+        os.remove(draft_file)
+    except NotImplementedError as e:
+        result['errors'].append(e.message)
+
+    return jsonify(result)
+
+
+@app.route('/publish', methods=['POST'])
+def publish():
+    """ Uploads a file to a draft area then moves it to data directory if valid.
+        Expects:
+            index_view_slug:   unique name of tif file to lookup(string)
+            file:              in request.files for upload
+    """
+
+    index_view_slug = request.form.get('index_view_slug')
+
+    if not index_view_slug or 'file' not in request.files:
+        abort(400)
+
+    if index_view_slug.endswith('_raster'):
+        index_view_slug = index_view_slug[:-7]
+
+    draft_file = os.path.join(conf.DRAFT_DIR,
+                              '{}.tif'.format(index_view_slug))
+    request.files['file'].save(draft_file)
+    result = {'errors': []}
+    try:
+        result['valid'] = is_valid(index_view_slug, base_path=conf.DRAFT_DIR)
+        if result['valid']:
+            live_file = make_live(draft_file)
+            if os.path.exists(live_file):
+                result = {
+                    'md5': md5sum(live_file),
+                }
+
+    #except Exception as e:
+    except NotImplementedError as e:
+        result['errors'].append(e.message)
+
+    return jsonify(result)
+
+
+@app.route('/md5')
+def get_md5_for_index_view_slug():
+    """ Gets the md5 value for a tif matching the slug parameter or -1 if
+    not found.
+
+        Expects:
+            index_view_slug:   unique name of tif file to lookup(string)
+    """
+    index_view_slug = request.args.get('index_view_slug')
+
+    if not index_view_slug:
+        abort(400)
+
+    value = -1
+    try:
+        raster_file = get_raster_file_path(index_view_slug)
+        value = md5sum(raster_file)
+
+    except IOError:
+        pass
+
+    result = {
+        'md5': value
+    }
+    return jsonify(result)
 
 
 @app.errorhandler(400)

@@ -2,8 +2,11 @@
 # -*- coding: iso-8859-15 -*-
 
 import conf
+import hashlib
 import os
 import psycopg2
+import shutil
+
 import rasterio
 
 from functools import partial
@@ -20,33 +23,98 @@ summary_stats = partial(summary, bounds=(0, 10), all_touched=False)
 summary_stats_touched = partial(summary, bounds=(0, 10), all_touched=True)
 
 
-def get_raster_file_path(raster):
+def md5sum(filename, block_size=65536):
+    hsh = hashlib.md5()
+    with open(filename, "rb") as f:
+        for block in iter(lambda: f.read(block_size), b""):
+            hsh.update(block)
+    return hsh.hexdigest()
+
+
+def is_valid(raster, points=None, base_path=None):
+    """
+
+    :param raster: raster name without_raster and .tif (string)
+    :param points:
+    :param base_path: either the draft or data directory, optional (string)
+
+    :return:
+    """
+    with rasterio.open(get_raster_file_path(raster)) as src:
+        if src.width < 2408 or src.height < 2408:
+            return False
+
+    default_points = [
+        (-4.48354500, 54.14074400), # Isle of man
+        (-0.83000000, 51.46000000), # London ish
+        ( 4.60000000, 47.60000000), # France ish
+        ( 35.0000000, 31.00000000), # Middle east ish
+        ( 23.5000000, -3.00000000), # Middle of Africa ish
+        (101.0000000, 26.00000000), # Somewhere in China
+        (-80.5200000, 25.25000000), # Tip of Florida, US
+
+        (25.12971600, -89.9863580), # Off shore, Gulf of Mexico
+        (30.24734900, 125.3710900), # Off shore, East China Sea
+    ]
+
+    points = points or default_points
+
+    base_path = base_path or conf.DRAFT_DIR
+
+    failures = 0
+
+    for idx, point in enumerate(points):
+        try:
+            results, _ = _get_buffer_values_at_points_from_file(
+                32,  # is it ok to provide default radius?
+                [(point[1], point[0], 999)],  # 999 is not used/validated
+                raster,
+                base_path=base_path
+            )
+        except (TypeError, AttributeError, ValueError):
+            failures += 1
+
+    # should we have some tolerance to a few failed points?
+    return failures < len(points)
+
+
+def make_live(draft_file):
+    """ Moves file from draft (pre-validation) dir to data (live) dir.
+
+    :param draft_file:
+    :return:
+    """
+    target_path = os.path.join(conf.DATA_DIR,
+                               draft_file.split('/')[-1])
+    shutil.move(draft_file, target_path)
+    return target_path
+
+
+def get_raster_file_path(raster, base_path=None):
     # We look for rasters in '../data' minus the '_raster' suffix and with a
     # '.tif' extension. We also do a case-insensitive lookup for files on disk
     # (the raster parameter is lowercased from the original request because
     # when we only looked things up in Postgres all table names were lower case
-    # so it made sense).
+    # so it made sense)
+
+    base_path = base_path or conf.DATA_DIR
     if raster.endswith('_raster'):
         raster = raster[:-7]
 
-    data_dir = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)),
-        '..',
-        'data',
-    )
+    if not raster.endswith('.tif'):
+        raster = '{}.tif'.format(raster)
 
-    fname = '{}.tif'.format(raster)
-    tifs = os.listdir(data_dir)
+    tifs = os.listdir(base_path)
 
-    if fname not in tifs:
+    if raster not in tifs:
         for tif in tifs:
-            if fname == tif.lower():
-                fname = tif
+            if raster == tif.lower():
+                raster = tif
                 break
         else:
             raise IOError("Can't find {}".format(raster))
 
-    return os.path.join(data_dir, fname)
+    return os.path.join(base_path, raster)
 
 
 def get_conn_cur():
@@ -310,6 +378,7 @@ def set_buffer_at_point(conn, cur, point, buf=25, legacy=False):
 
         # Set our geometry to a be a single point
         query_string = SET_BUFFER_AT_POINT_SQL % "POINT(%s %s)"
+
     # Create the buffer
     cur.execute(query_string, (id, lng, lat, buf, id))
 
@@ -362,7 +431,6 @@ def get_buffer_value_at_polygon(conn, cur, point_id, polygon, raster,
             # could exceed have an area > 2 pixels yet still not
             # have an 'mostly within' pixels
             if result is None:
-                print src.res[0]
                 twice_pixel_area = ((src.res[0] * src.res[1]) * 2)
                 if geom.area < twice_pixel_area:
                     result = summary_stats_touched(src, geom)
@@ -407,20 +475,24 @@ def get_buffer_values_at_points(conn, cur, buf, points, raster, explain=False,
         result = cur.fetchall()
         return result, explanation
     else:
-        # If the table isn't in the database, we check for a geotiff file on
-        # disk with a matching name that we can read stats from using Winston.
-        with rasterio.open(get_raster_file_path(raster)) as src:
-            results = []
-            for lon, lat, point_id in points:
-                geom = Point(lon, lat).buffer(buf / 111.13)
-                result = summary_stats(src, geom)
+        return _get_buffer_values_at_points_from_file(buf, points, raster)
 
-                # If we have a tiny area, include touched pixels on return of
-                # no result from any one pixel.
-                if result is None:
-                    twice_pixel_size = ((src.res[0] * 111.13) * 2)
-                    if buf < twice_pixel_size:
-                        result = summary_stats_touched(src, geom)
 
-                results.append((point_id, float(result.mean)))
-            return results, None
+def _get_buffer_values_at_points_from_file(buf, points, raster, base_path=None):
+    # If the table isn't in the database, we check for a geotiff file on
+    # disk with a matching name that we can read stats from using Winston.
+    with rasterio.open(get_raster_file_path(raster, base_path)) as src:
+        results = []
+        for lon, lat, point_id in points:
+            geom = Point(lon, lat).buffer(buf / 111.13)
+            result = summary_stats(src, geom)
+
+            # If we have a tiny area, include touched pixels on return of
+            # no result from any one pixel.
+            if result is None:
+                twice_pixel_size = ((src.res[0] * 111.13) * 2)
+                if buf < twice_pixel_size:
+                    result = summary_stats_touched(src, geom)
+
+            results.append((point_id, float(result.mean)))
+        return results, None

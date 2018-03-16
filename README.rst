@@ -6,17 +6,14 @@ point-buffer data from raster files stored in a PostGIS 2 database.
 
 Test setup
 ==========
-Some system level dependencies must be met in order to run this application.
-For Ubuntu systems, please follow the steps outlined here:
+Some system level dependencies required here, please run::
 
-http://suite.opengeo.org/ee/docs/4.5/intro/installation/ubuntu/install.html
+    test/test_setup.sh
 
-Nothing fancy here (yet). Once installed per the link above, just run 
-'tests/test_runner.sh' script for basic test run through with a single raster.
 
-Alternatively, run tests/test_setup.sh once and manually run all tests by executing::
+Manually run all tests by executing::
 
-    python tests/test.py
+    tests/test_runner.sh
 
 
 Deployment with Runit and Nginx
