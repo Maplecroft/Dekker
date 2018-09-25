@@ -1,10 +1,10 @@
-Flask==0.8
+Flask==1.0.2
 Werkzeug==0.8.3
 Jinja2==2.6
 argparse==1.2.1
 psycopg2==2.4.5
 simplejson==2.5.2
 wsgiref==0.1.2
-gunicorn==0.14.3
+gunicorn==19.9.0
 gevent==1.0.1
 winston==0.2.2
