@@ -42,7 +42,7 @@ def is_valid(raster, points=None, base_path=None):
     """
     filepath = get_raster_file_path(raster, base_path=base_path)
     with rasterio.open(filepath) as src:
-        if src.width < 2408 or src.height < 2408:
+        if src.width < 2408 or src.height < 1200:
             return False
 
     default_points = [

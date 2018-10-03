@@ -169,8 +169,10 @@ class DekkerTestCase(unittest.TestCase):
         # Now try something invalid
         resp = client.post(
             '/validate',
-            buffered=True,
-            content_type='multipart/form-data',
+            headers=dict(
+                buffered=True,
+                content_type='multipart/form-data',
+            ),
             data={
                 'file': (
                     open(
